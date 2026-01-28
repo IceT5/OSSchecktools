@@ -1,3 +1,17 @@
+# Copyright （c）2026 Icet5. All rights reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import subprocess
 import sys
@@ -188,14 +202,14 @@ def cleanup_extract_dir(extracted_dir: Path):
         print(f"[WARN] Path is not a directory, skip cleanup: {extract_dir}")
         return
 
-    # 额外安全校验：目录名必须以 _extract 结尾
+    # 额外安全校验：目录名必须以 -extract 结尾
     if not extract_dir.name.endswith("-extract"):
         print(f"[WARN] Directory name does not end with '-extract', skip cleanup: {extract_dir}")
         return
 
     try:
         shutil.rmtree(extracted_dir)
-        # os.remove(RESULT_JSON)
+        os.remove(RESULT_JSON)
         print(f"[OK] Cleaned up extracted directory: {extract_dir}")
     except Exception as e:
         print(f"[WARN] Failed to cleanup extracted directory: {extract_dir}")
@@ -232,5 +246,5 @@ if __name__ == "__main__":
         raise
 
     else:
-        #  只有全部成功，才清理
+        # 5. cleanup
         cleanup_extract_dir(extract_dir)
