@@ -4,23 +4,17 @@
 ## 环境准备
 工具依托scancode-toolkit的copyright提取功能，所以需要确保环境满足scancode-toolkit运行要求，详见[官方文档](https://scancode-toolkit.readthedocs.io/en/stable/getting-started/installation/index.html#installation-prerequisites)
 
-本工具开发和测试的环境为：Ubuntu 22.04 python3.10-3.11 ，在windows环境运行时，可能会出现自动生成的临时目录路径过长，导致自动删除临时目录失败，如确需在windows环境使用，建议修改系统参数配置。
+本工具开发和测试的环境为：`Ubuntu 22.04` `python3.10&python3.11` `pip 25.2` ，在windows环境运行时，可能会出现自动生成的临时目录路径过长，导致自动删除临时目录失败，如确需在windows环境使用，建议修改系统参数配置。
 
 ## 输入
-从开源软件的官方仓库下载源代码包，当前版本仅支持对源代码包进行扫描（即zip或tar文件）
-（后续功能拆分后，可支持直接对项目目录执行扫描，例如git clone后的目录）
+支持对开源软件源码包（一般为zip或tar文件）以及源码目录（如git clone后的目录）执行扫描。
 
 ## 运行
-`pip install -r requirments.txt`
-
-`python Copyright_extraction.main {archive}` 
-
-或 
-
-`python Copyright_extraction.main {path}`
+进入Copyright_extraction目录后，执行`pip install -e .`；
+安装完成后，会生成cret命令，执行`cret {archive}` 或 `cret {path}`
 
 ## 输出
-工具运行完成后，会在源代码包同级目录中，生成以 {源代码包名}_copyright 命名的文本文件
+工具运行完成后，会在被测目标的同级目录中，生成以 {被测目标名}_copyright 命名的文件
 
 ## 模块简介
 ### main.py
