@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Copyright_extraction"
+version = "0.1.0"
+description = "Lightweight OSS compliance scanning toolkit based on ScanCode Toolkit"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+
+authors = [
+    { name = "IceT5", email = "393261895@qq.com" }
+]
+
+dependencies = [
+    "scancode-toolkit>=32.0",
+]
+
+[project.urls]
+Source = "https://github.com/IceT5/OSSchecktools"
+Issues = "https://github.com/IceT5/OSSchecktools/issues"
+
+[project.scripts]
+cret = "copyright_extraction.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
