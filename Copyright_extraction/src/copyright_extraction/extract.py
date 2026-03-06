@@ -19,6 +19,8 @@ import sys
 import subprocess
 from pathlib import Path
 
+from .logger import info, cmd as log_cmd
+
 def run_extractcode(target: str) -> Path:
     """
     When target is an archive, execute this function.
@@ -38,8 +40,8 @@ def run_extractcode(target: str) -> Path:
         str(archive),
     ]
 
-    print("Running extractcode:")
-    print(" ".join(cmd))
+    info("Running extractcode:")
+    log_cmd(" ".join(cmd))
 
     result = subprocess.run(
         cmd,

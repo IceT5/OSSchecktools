@@ -16,14 +16,21 @@ import sys
 import subprocess
 from pathlib import Path
 
-def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8):
+from .logger import info, cmd as log_cmd
+
+def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8, scan_license: bool = False):
     """
     Run ScanCode Toolkit.
+    
+    Args:
+        scan_target: 要扫描的目标路径
+        result_json: 输出JSON文件路径
+        jobs: 并行任务数
+        scan_license: 是否扫描license信息
     """
     cmd = [
         "scancode",
-        "-c",
-        "--filter-clues",
+        "-c",  # 扫描copyright
         "--only-findings",
         "--json-pp",
         str(result_json),
@@ -31,9 +38,13 @@ def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8):
         "-n",
         str(jobs),
     ]
+    
+    # 添加license扫描参数
+    if scan_license:
+        cmd.insert(1, "-l")  # 扫描license
 
-    print("[INFO] Running scancode:")
-    print(" ".join(cmd))
+    info("Running scancode:")
+    log_cmd(" ".join(cmd))
 
     result = subprocess.run(
         cmd,

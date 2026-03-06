@@ -15,10 +15,22 @@
 import json
 from pathlib import Path
 
+from .logger import info
+
 def extract_and_duplicate_copyright(
     result_json: Path,
     output_txt: Path,
-):
+) -> list:
+    """
+    从scancode结果中提取copyright信息并写入文件。
+    
+    Args:
+        result_json: scancode输出的JSON文件路径
+        output_txt: 输出文件路径
+    
+    Returns:
+        list: 提取的copyright记录列表
+    """
     ignored_suffixes = {
         ".md",
         ".rst",
@@ -60,6 +72,8 @@ def extract_and_duplicate_copyright(
         for item in duplicated_results:
             f.write(item.strip() + "\n")
 
-    print(f"Extracted {len(duplicated_results)} unique records")
-    print(f"Output written to {output_txt}")
+    info(f"Extracted {len(duplicated_results)} unique records")
+    info(f"Output written to {output_txt}")
+    
+    return duplicated_results
 

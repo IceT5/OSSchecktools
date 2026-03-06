@@ -14,6 +14,8 @@
 
 import subprocess
 
+from .logger import ok
+
 def check_scancode_available():
     """
     Check whether scancode command is available.
@@ -35,4 +37,4 @@ def check_scancode_available():
             f"stderr: {result.stderr}"
         )
 
-    print(f"[OK] Scancode available: {result.stdout.strip()}")
+    ok(f"Scancode available: {result.stdout.strip()}")

@@ -15,26 +15,28 @@
 import shutil
 from pathlib import Path
 
+from .logger import info, ok, warn
+
 def cleanup_extract_dir(extract_dir: Path):
     """
     Safety delete extractcode path, if target is not archive, skip this function
     """
     if not extract_dir.exists():
-        print(f"[INFO] Extracted directory not found, skip cleanup: {extract_dir}")
+        info(f"Extracted directory not found, skip cleanup: {extract_dir}")
         return
 
     if not extract_dir.is_dir():
-        print(f"[WARN] Path is not a directory, skip cleanup: {extract_dir}")
+        warn(f"Path is not a directory, skip cleanup: {extract_dir}")
         return
 
     # 额外安全校验：目录名必须以 -extract 结尾
     if not extract_dir.name.endswith("-extract"):
-        print(f"[WARN] Directory name does not end with '-extract', skip cleanup: {extract_dir}")
+        warn(f"Directory name does not end with '-extract', skip cleanup: {extract_dir}")
         return
 
     try:
         shutil.rmtree(extract_dir)
-        print(f"[OK] Cleaned up extracted directory: {extract_dir}")
+        ok(f"Cleaned up extracted directory: {extract_dir}")
     except Exception as e:
-        print(f"[WARN] Failed to cleanup extracted directory: {extract_dir}")
-        print(f"       Reason: {e}")
+        warn(f"Failed to cleanup extracted directory: {extract_dir}")
+        warn(f"       Reason: {e}")
