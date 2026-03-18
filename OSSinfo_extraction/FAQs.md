@@ -19,6 +19,19 @@ A: 工具依赖 ScanCode Toolkit，请确保环境满足 ScanCode 的运行要�
 
 ## License 识别问题
 
+### Q: 什么是SPDX许可证标识符？
+A: SPDX (Software Package Data Exchange) 标识符是开源许可证的标准化短名称，由 Linux 基金会的 SPDX 项目维护。使用 SPDX 标识符可以确保许可证识别的准确性和一致性。
+
+**重要提示**：使用 `-l` 参数指定 license 名称时，**必须使用 SPDX 标识符**。
+
+例如：
+- ✅ 正确：`-l "MIT"`、`-l "Apache-2.0"`、`-l "GPL-3.0-only"`
+- ❌ 错误：`-l "mit license"`、`-l "Apache License 2.0"`、`-l "GNU GPL v3"`
+
+完整的 SPDX 许可证标识符列表请参考：
+- [README.md - 宯整SPDX许可证标识符列表](README.md#完整spdx许可证标识符列表)
+- [SPDX官网许可证列表](https://spdx.org/licenses/)
+
 ### Q: 为什么我的 license 没有被识别？
 A: 请检查以下几点：
 1. **文件位置**：license 文件是否在根目录或 LICENSES 目录下

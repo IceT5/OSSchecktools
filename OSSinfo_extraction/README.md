@@ -96,10 +96,18 @@ cret -t <target> -n <software_name> -v <software_version> [可选参数]
 ### 可选参数
 | 参数 | 长参数 | 说明 |
 |------|--------|------|
-| `-l` | `--license` | License名称（如：MIT, Apache-2.0） |
+| `-l` | `--license` | License名称，**必须使用SPDX许可证标识符**（如：MIT, Apache-2.0） |
 | `-p` | `--license-path` | License文件相对路径（相对于代码根目录） |
 | `-o` | `--output-dir` | 输出目录，默认为被测目标同级目录 |
 | `--guide` | | 显示详细使用指南 |
+
+### ⚠️ 重要提示：License名称必须使用SPDX标识符
+
+使用 `-l` 参数指定license名称时，**必须使用符合 [SPDX (Software Package Data Exchange)](https://spdx.org/licenses/) 标准的许可证标识符**。SPDX标识符是开源许可证的标准化短名称，确保许可证识别的准确性和一致性。
+
+例如：
+- ✅ 正确：`-l "MIT"`、`-l "Apache-2.0"`、`-l "GPL-3.0-only"`
+- ❌ 错误：`-l "mit license"`、`-l "Apache License 2.0"`、`-l "GNU GPL v3"`
 
 ### 使用示例
 ```bash
@@ -170,30 +178,132 @@ LOG_LEVEL=QUIET cret -t package.zip -n "MySoftware" -v "1.0.0"
 
 ## 支持的许可证
 
-本工具的许可证识别能力基于 [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit) 的许可证数据库。
+本工具的许可证识别能力基于 [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit) 的许可证数据库。使用 `-l` 参数时，**必须使用SPDX许可证标识符**。
 
-### 常用开源许可证
+### 完整SPDX许可证标识符列表
 
-以下是工具支持识别的常用开源许可证（SPDX标识符）：
+以下是常用的SPDX许可证标识符，按类型分类：
 
-| 许可证类型 | SPDX标识符 |
+#### 宽松许可证 (Permissive Licenses)
+
+| 许可证名称 | SPDX标识符 |
 |------------|------------|
 | MIT License | `MIT` |
-| Apache License 2.0 | `Apache-2.0` |
-| BSD 2-Clause License | `BSD-2-Clause` |
-| BSD 3-Clause License | `BSD-3-Clause` |
-| GNU GPL v3.0 | `GPL-3.0` |
-| GNU LGPL v3.0 | `LGPL-3.0` |
-| Mozilla Public License 2.0 | `MPL-2.0` |
-| Creative Commons Zero v1.0 | `CC0-1.0` |
 | ISC License | `ISC` |
-| Artistic License 2.0 | `Artistic-2.0` |
+| Zero-Clause BSD | `0BSD` |
+| Unlicense | `Unlicense` |
+
+#### Apache 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| Apache License 1.0 | `Apache-1.0` |
+| Apache License 1.1 | `Apache-1.1` |
+| Apache License 2.0 | `Apache-2.0` |
+
+#### BSD 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| BSD 2-Clause "Simplified" License | `BSD-2-Clause` |
+| BSD 2-Clause FreeBSD License | `BSD-2-Clause-FreeBSD` |
+| BSD 2-Clause NetBSD License | `BSD-2-Clause-NetBSD` |
+| BSD 3-Clause "New" or "Revised" License | `BSD-3-Clause` |
+| BSD 3-Clause Attribution License | `BSD-3-Clause-Attribution` |
+| BSD 3-Clause Clear License | `BSD-3-Clause-Clear` |
+| BSD 3-Clause LBNL License | `BSD-3-Clause-LBNL` |
+| BSD 4-Clause "Original" License | `BSD-4-Clause` |
+
+#### GPL 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| GNU General Public License v2.0 only | `GPL-2.0-only` |
+| GNU General Public License v2.0 or later | `GPL-2.0-or-later` |
+| GNU General Public License v3.0 only | `GPL-3.0-only` |
+| GNU General Public License v3.0 or later | `GPL-3.0-or-later` |
+| GNU General Public License v1.0 only | `GPL-1.0-only` |
+| GNU General Public License v1.0 or later | `GPL-1.0-or-later` |
+
+> **注意**：ScanCode 可能也识别为 `GPL-2.0` 或 `GPL-3.0`（不带后缀），建议使用完整标识符。
+
+#### LGPL 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| GNU Lesser General Public License v2.0 only | `LGPL-2.0-only` |
+| GNU Lesser General Public License v2.0 or later | `LGPL-2.0-or-later` |
+| GNU Lesser General Public License v2.1 only | `LGPL-2.1-only` |
+| GNU Lesser General Public License v2.1 or later | `LGPL-2.1-or-later` |
+| GNU Lesser General Public License v3.0 only | `LGPL-3.0-only` |
+| GNU Lesser General Public License v3.0 or later | `LGPL-3.0-or-later` |
+| GNU Library General Public License v2 only | `LGPL-2.0` |
+| GNU Library General Public License v2 or later | `LGPL-2.0+` |
+| GNU Library General Public License v2.1 only | `LGPL-2.1` |
+| GNU Library General Public License v2.1 or later | `LGPL-2.1+` |
+
+#### AGPL 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| GNU Affero General Public License v3.0 only | `AGPL-3.0-only` |
+| GNU Affero General Public License v3.0 or later | `AGPL-3.0-or-later` |
+
+#### MPL 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| Mozilla Public License 1.0 | `MPL-1.0` |
+| Mozilla Public License 1.1 | `MPL-1.1` |
+| Mozilla Public License 2.0 | `MPL-2.0` |
+| Mozilla Public License 2.0 (no copyleft exception) | `MPL-2.0-no-copyleft-exception` |
+
+#### Eclipse 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
 | Eclipse Public License 1.0 | `EPL-1.0` |
 | Eclipse Public License 2.0 | `EPL-2.0` |
-| GNU Affero GPL v3.0 | `AGPL-3.0` |
-| Unlicense | `Unlicense` |
+| Eclipse Distribution License 1.0 | `EDL-1.0` |
+| Eclipse Public License 2.0 | `EPL-2.0` |
+
+#### Creative Commons 许可证系列
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| Creative Commons Zero v1.0 Universal | `CC0-1.0` |
+| Creative Commons Attribution 4.0 International | `CC-BY-4.0` |
+| Creative Commons Attribution Share Alike 4.0 International | `CC-BY-SA-4.0` |
+| Creative Commons Attribution Non Commercial 4.0 International | `CC-BY-NC-4.0` |
+| Creative Commons Attribution No Derivatives 4.0 International | `CC-BY-ND-4.0` |
+| Creative Commons Attribution Non Commercial Share Alike 4.0 International | `CC-BY-NC-SA-4.0` |
+| Creative Commons Attribution Non Commercial No Derivatives 4.0 International | `CC-BY-NC-ND-4.0` |
+
+#### 其他常用许可证
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| Artistic License 2.0 | `Artistic-2.0` |
 | PostgreSQL License | `PostgreSQL` |
 | zlib License | `Zlib` |
+| Boost Software License 1.0 | `BSL-1.0` |
+| SIL Open Font License 1.1 | `OFL-1.1` |
+| Universal Permissive License v1.0 | `UPL-1.0` |
+| Do What The F*ck You Want To Public License | `WTFPL` |
+| Fair License | `Fair` |
+| ISC License | `ISC` |
+| NTP License | `NTP` |
+| NTP License (legal text) | `NTP-0` |
+| SQLite Blessing | `blessing` |
+| SQLite Public Domain | `SQLite-PD` |
+
+#### 专有/商业许可证
+
+| 许可证名称 | SPDX标识符 |
+|------------|------------|
+| Proprietary | `Proprietary` |
+| Commercial | `Commercial` |
+| Other / Non-Standard | `NOASSERTION` |
 
 ### 特别说明
 
