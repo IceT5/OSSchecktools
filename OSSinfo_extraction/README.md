@@ -45,6 +45,28 @@
 ### 7. 安全清理机制
 工具执行完成后自动清理临时文件和解压目录，保持工作环境整洁。如执行出错，保留临时文件以便调试。
 
+### 8. License文件路径优先级处理
+当项目中有多个相同类型的license文件时，工具会按路径优先级自动选择：
+- **根目录下的license文件优先**（如 `LICENSE.MIT`）- 优先级最高
+- **LICENSES目录下的文件次之**（如 `LICENSES/MIT.txt`）- 优先级次之
+- **其他目录的文件最低** - 避免误匹配子目录中的license文件
+
+### 9. 广泛的License文件名模式支持
+支持60+种常见的license文件名模式识别，包括：
+- 通用模式：`LICENSE`, `LICENSE.txt`, `LICENSE.md`, `COPYING`, `NOTICE` 等
+- 许可证特定模式：`LICENSE-MIT`, `LICENSE_APACHE`, `MIT.txt`, `Apache-2.0.txt` 等
+- SPDX标识符格式：`GPL-3.0`, `BSD-3-Clause`, `LGPL-3.0` 等
+- 支持多种文件扩展名：`.txt`, `.md`, `.rst`, `.html`, `.json`, `.yaml` 等
+
+### 10. License文本自动读取与回退机制
+生成 `Readme.opensource` 时，工具会智能读取完整的license文本：
+- **优先从源文件读取**：直接读取license文件完整内容，确保文本完整性
+- **回退使用matched_text**：如果文件读取失败，使用scancode扫描的匹配文本
+- **路径自动清理**：自动处理解压目录前缀，正确匹配license文件路径
+
+### 11. Copyright关键字验证
+提取copyright信息时，只保留包含"copyright"关键字的声明，有效过滤无效或误识别的copyright信息，提高结果准确性。
+
 ## 环境准备
 工具依托scancode-toolkit的copyright提取功能，所以需要确保环境满足scancode-toolkit运行要求，详见[官方文档](https://scancode-toolkit.readthedocs.io/en/stable/getting-started/installation/index.html#installation-prerequisites)
 
@@ -314,4 +336,10 @@ License处理模块，核心功能包括：
 
 ### logger.py
 日志模块，提供分级日志输出功能，支持DEBUG/INFO/WARN/ERROR/OK级别，可通过环境变量控制输出级别。
+
+### __init__.py
+工具包初始化文件，定义包版本信息。
+
+### __main__.py
+支持通过 `python -m ossinfo_extraction` 方式运行工具。
 
