@@ -3,7 +3,7 @@ requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Copyright_extraction"
+name = "OSSinfo_extraction"
 version = "0.5.0"
 description = "OSS Notice toolkit based on ScanCode Toolkit"
 readme = "README.md"
@@ -15,7 +15,7 @@ authors = [
 ]
 
 dependencies = [
-    "scancode-toolkit>=32.0",
+    "scancode-toolkit==32.5.0",
 ]
 
 [project.urls]
@@ -23,7 +23,7 @@ Source = "https://github.com/IceT5/OSSchecktools"
 Issues = "https://github.com/IceT5/OSSchecktools/issues"
 
 [project.scripts]
-cret = "copyright_extraction.main:main"
+cret = "ossinfo_extraction.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

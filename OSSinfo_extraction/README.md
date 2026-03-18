@@ -1,4 +1,4 @@
-# Copyright & License Extraction Tool
+# OSS information Extraction Tool
 
 # 概述
 本工具用于从开源软件源码包中自动提取版权信息（copyright）和许可证信息（license），生成标准化的 `Readme.opensource` 文件。工具基于 [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit) 的扫描能力，并针对实际使用场景进行了多项优化。
@@ -56,7 +56,7 @@
 支持的压缩格式：`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`
 
 ## 运行
-进入Copyright_extraction目录后，执行`pip install -e .`；
+进入OSSinfo_extraction目录后，执行`pip install -e .`；
 安装完成后，会生成cret命令，执行以下格式运行：
 
 ### 命令格式

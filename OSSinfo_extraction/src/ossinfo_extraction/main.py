@@ -30,7 +30,7 @@ from .cleanup import cleanup_extract_dir
 def print_guide():
     """打印详细使用指南"""
     guide = """
-                    Copyright & License Extraction Tool
+                    OSS information Extraction Tool
                       版权与许可证信息提取工具使用指南
 
 【工具简介 / Tool Introduction】

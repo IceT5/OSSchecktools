@@ -1,6 +1,6 @@
 # 常见问题 (FAQs)
 
-本文档收集了 Copyright & License Extraction Tool 使用过程中的常见问题及解答。
+本文档收集了 OSS information Extraction Tool 使用过程中的常见问题及解答。
 
 ## 安装与环境
 
@@ -8,7 +8,7 @@
 A: 工具开发和测试环境为 `Ubuntu 22.04`，使用 `Python 3.10/3.11`。在 Windows 环境运行时，可能会出现自动生成的临时目录路径过长，导致自动删除临时目录失败。如确需在 Windows 环境使用，建议修改系统参数配置启用长路径支持。
 
 ### Q: 如何安装工具？
-A: 进入 Copyright_extraction 目录后，执行：
+A: 进入 OSSinfo_extraction 目录后，执行：
 ```bash
 pip install -e .
 ```

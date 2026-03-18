@@ -18,9 +18,12 @@ from pathlib import Path
 
 from .logger import info, cmd as log_cmd
 
+
 def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8, scan_license: bool = False):
     """
     Run ScanCode Toolkit.
+    
+    直接调用 scancode 命令进行扫描。
     
     Args:
         scan_target: 要扫描的目标路径

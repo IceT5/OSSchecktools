@@ -1,6 +1,6 @@
 # 设计逻辑
 
-本文档详细说明 Copyright & License Extraction Tool 的核心设计逻辑。
+本文档详细说明 OSS information Extraction Tool 的核心设计逻辑。
 
 ## 误匹配过滤设计
 
