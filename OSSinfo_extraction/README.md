@@ -403,53 +403,10 @@ License Expression: apache-2.0
 
 ## 更多文档
 
-- [设计逻辑 (DESIGN.md)](DESIGN.md) - 详细的设计逻辑说明
-- [常见问题 (FAQs.md)](FAQs.md) - 常见问题解答
+- [设计文档 (DESIGN.md)](DESIGN.md) - 详细设计逻辑和模块说明
+- [常见问题 (FAQs.md)](FAQs.md) - 常见问题及故障排查
 
-## 模块简介
+## 许可证
 
-### main.py
-工具主入口，负责：
-- 解析命令行参数
-- 协调整个提取流程
-- 处理嵌套目录检测
-- 错误处理和清理
-
-### prerequisite.py
-环境检查模块，使用 `scancode --version` 命令验证运行环境是否具备运行条件。
-
-### extract.py
-源码包解压模块，使用scancode-toolkit中的extractcode功能对源码包进行提取。如被测目标已经是源码目录，会自动跳过提取环节。
-
-### scancode.py
-扫描模块，调用scancode工具对项目中全量copyright和license信息进行扫描，生成JSON格式的扫描结果。
-
-### parse_and_duplication.py
-Copyright处理模块，负责：
-- 从扫描结果中提取copyright信息
-- 去除重复的copyright声明
-- 过滤文档文件中的copyright信息
-
-### license_extraction.py
-License处理模块，核心功能包括：
-- 自动提取：从根目录下license相关文件中提取license信息
-- 按名称查找：根据用户提供的license名称查找对应的文件路径
-- 按路径提取：根据用户提供的文件路径提取license名称
-- 误匹配过滤：两层保护机制过滤非完整license文本的误报
-- 参数校验：验证用户提供的license名称和路径是否一致
-
-### readme_opensource.py
-输出模块，生成标准格式的Readme.opensource文件，包含软件名称、版本、copyright声明和完整license文本。
-
-### cleanup.py
-清理模块，自动删除工具执行过程中产生的过程文件，如源代码包提取后的代码文件等。
-
-### logger.py
-日志模块，提供分级日志输出功能，支持DEBUG/INFO/WARN/ERROR/OK级别，可通过环境变量控制输出级别。
-
-### __init__.py
-工具包初始化文件，定义包版本信息。
-
-### __main__.py
-支持通过 `python -m ossinfo_extraction` 方式运行工具。
+本项目采用 Apache License 2.0 许可证。
 

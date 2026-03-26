@@ -1,111 +1,190 @@
 # 常见问题 (FAQs)
 
-本文档收集了 OSS information Extraction Tool 使用过程中的常见问题及解答。
+本文档收集了 OSS Information Extraction Tool 使用过程中的常见问题、故障排查步骤及解决方案。
 
-## 安装与环境
+## 目录
+
+- [故障排查流程](#故障排查流程)
+- [安装与环境问题](#安装与环境问题)
+- [License相关问题](#license相关问题)
+- [Copyright相关问题](#copyright相关问题)
+- [输出相关问题](#输出相关问题)
+- [其他问题](#其他问题)
+
+---
+
+## 故障排查流程
+
+遇到问题时，建议按以下步骤排查：
+
+```
+1. 启用调试日志
+   LOG_LEVEL=DEBUG cret -t ...
+   │
+   ▼
+2. 查看日志输出
+   - 是否有 ERROR 级别错误？
+   - 是否有 WARN 级别警告？
+   │
+   ▼
+3. 根据错误类型定位问题
+   - 安装错误 → 查看[安装与环境问题](#安装与环境问题)
+   - License识别问题 → 查看[License相关问题](#license相关问题)
+   - Copyright提取问题 → 查看[Copyright相关问题](#copyright相关问题)
+   │
+   ▼
+4. 问题仍未解决？
+   - 查看 [DESIGN.md](DESIGN.md) 了解设计逻辑
+   - 向项目提交 Issue
+```
+
+---
+
+## 安装与环境问题
 
 ### Q: 工具支持哪些操作系统？
-A: 工具开发和测试环境为 `Ubuntu 22.04`，使用 `Python 3.10/3.11`。在 Windows 环境运行时，可能会出现自动生成的临时目录路径过长，导致自动删除临时目录失败。如确需在 Windows 环境使用，建议修改系统参数配置启用长路径支持。
+
+**A:** 
+- **推荐**：Ubuntu 22.04，Python 3.10/3.11
+- **Windows**：可能出现临时目录路径过长导致删除失败的问题
+
+**Windows 用户解决方案：**
+- 修改系统注册表启用长路径支持
+- 或手动删除临时目录（位于目标文件同目录下，名称类似 `xxx-extract`）
+
+### Q: 安装时提示 scancode 相关错误怎么办？
+
+**A:** 工具依赖 ScanCode Toolkit，请确保环境满足其运行要求。
+
+**排查步骤：**
+1. 检查 scancode 是否正确安装：
+   ```bash
+   scancode --version
+   ```
+2. 如未安装或报错，请参考 [ScanCode 官方文档](https://scancode-toolkit.readthedocs.io/en/stable/getting-started/installation/index.html#installation-prerequisites)
 
 ### Q: 如何安装工具？
-A: 进入 OSSinfo_extraction 目录后，执行：
+
+**A:** 
 ```bash
+cd OSSinfo_extraction
 pip install -e .
 ```
 安装完成后会生成 `cret` 命令。
 
-### Q: 安装时提示 scancode 相关错误怎么办？
-A: 工具依赖 ScanCode Toolkit，请确保环境满足 ScanCode 的运行要求。详见 [ScanCode 官方文档](https://scancode-toolkit.readthedocs.io/en/stable/getting-started/installation/index.html#installation-prerequisites)。
+---
 
-## License 识别问题
+## License相关问题
 
-### Q: 什么是SPDX许可证标识符？
-A: SPDX (Software Package Data Exchange) 标识符是开源许可证的标准化短名称，由 Linux 基金会的 SPDX 项目维护。使用 SPDX 标识符可以确保许可证识别的准确性和一致性。
+### Q: 为什么 license 没有被识别？
 
-**重要提示**：使用 `-l` 参数指定 license 名称时，**必须使用 SPDX 标识符**。
+**A:** 请按以下顺序排查：
 
-例如：
-- ✅ 正确：`-l "MIT"`、`-l "Apache-2.0"`、`-l "GPL-3.0-only"`
-- ❌ 错误：`-l "mit license"`、`-l "Apache License 2.0"`、`-l "GNU GPL v3"`
+| 检查项 | 要求 | 说明 |
+|--------|------|------|
+| 文件位置 | 根目录或 LICENSES 目录 | 不支持其他目录 |
+| 文件命名 | 符合规范 | 如 LICENSE, LICENSE.MIT, COPYING |
+| 文件格式 | 文本格式 | 不支持二进制文件 |
+| 文件内容 | 完整许可证文本 | 片段声明可能被过滤 |
 
-完整的 SPDX 许可证标识符列表请参考：
-- [README.md - 宯整SPDX许可证标识符列表](README.md#完整spdx许可证标识符列表)
-- [SPDX官网许可证列表](https://spdx.org/licenses/)
-
-### Q: 为什么我的 license 没有被识别？
-A: 请检查以下几点：
-1. **文件位置**：license 文件是否在根目录或 LICENSES 目录下
-2. **文件命名**：license 文件命名是否符合规范（如 LICENSE, LICENSE.MIT 等）
-3. **文件格式**：文件是否为文本格式，非二进制文件
-4. **调试模式**：使用 `LOG_LEVEL=DEBUG` 查看详细日志，了解扫描过程中的具体信息
-
-### Q: 工具支持识别哪些许可证？
-A: 工具的许可证识别能力基于 ScanCode Toolkit 的许可证数据库，支持 MIT、Apache-2.0、BSD、GPL、LGPL 等常用开源许可证。运行以下命令查看 ScanCode 支持的所有许可证：
+**调试方法：**
 ```bash
-scancode --list-licenses
+LOG_LEVEL=DEBUG cret -t package.zip -n "Software" -v "1.0.0"
 ```
-
-### Q: 如何处理工具不支持的许可证？
-A: 推荐使用 `-l` 和 `-p` 参数同时指定许可证名称和文件路径：
-```bash
-cret -t package.zip -n "MySoftware" -v "1.0.0" -l "Custom-License" -p "LICENSE"
-```
-这样可以跳过自动检测，直接使用您提供的参数。
 
 ### Q: 为什么 LGPL-3.0 许可证识别失败？
-A: ScanCode Toolkit 不支持 `LGPL-3.0-only` 和 `LGPL-3.0-or-later` 这两种 SPDX 标识符，只支持 `LGPL-3.0`。请使用：
+
+**A:** ScanCode Toolkit 不支持 `LGPL-3.0-only` 和 `LGPL-3.0-or-later`，只支持 `LGPL-3.0`。
+
+**解决方案：**
 ```bash
-cret -t package.zip -n "MySoftware" -v "1.0.0" -l "LGPL-3.0"
+cret -t package.zip -n "Software" -v "1.0.0" -l "LGPL-3.0"
 ```
 
-### Q: Makefile 被误识别为 MIT 许可证怎么办？
-A: 工具已内置误匹配过滤机制，会自动过滤此类误报。如果仍遇到问题，请使用 `-l` 和 `-p` 参数明确指定许可证信息。
+### Q: 使用 `-l` 参数时提示许可证未找到？
 
-## 参数使用问题
+**A:** 
+1. **确认使用 SPDX 标识符**：必须使用标准短名称，如 `MIT`、`Apache-2.0`、`GPL-3.0-only`
+2. **查看 ScanCode 支持的许可证列表**：
+   ```bash
+   scancode --list-licenses
+   ```
+3. **使用 `-l` 和 `-p` 同时指定**：跳过自动检测
 
-### Q: 什么时候应该同时指定 `-l` 和 `-p` 参数？
-A: 当您明确知道软件的许可证名称和许可证文件位置时，建议同时指定这两个参数。这样可以：
-- 跳过自动检测，结果最准确
-- 避免潜在的误识别
-- 工具会进行一致性校验，确保参数正确
+### Q: 指定了 license 名称和路径，但提示"请人工核对"？
 
-### Q: 只指定 `-l` 参数会发生什么？
-A: 工具会在项目根目录和 LICENSES 目录中查找与指定名称匹配的 license 文件，并提取对应的 license 信息。
+**A:** 这表示工具检测到名称与文件内容可能不匹配。请检查：
+- 指定的 license 名称是否正确
+- 指定的文件路径是否正确
+- 文件内容是否确实包含该许可证
 
-### Q: 只指定 `-p` 参数会发生什么？
-A: 工具会从指定路径的文件中提取 license 名称和内容。路径必须是相对于项目根目录的相对路径。
+### Q: 如何处理工具不支持的许可证？
 
-### Q: 为什么会出现"请人工核对"的警告？
-A: 当工具无法完全确认 license 信息的准确性时，会提示用户人工核对。常见场景包括：
-- 未同时提供 license 名称和路径
-- 提供的 license 名称与文件内容不匹配
-- 自动检测到多个 license
-
-建议使用 `-l` 和 `-p` 参数同时指定 license 名称和路径以获得最准确的结果。
-
-## 多许可证问题
-
-### Q: 如何处理多许可证项目？
-A: 工具会自动检测并输出所有检测到的 license。每个 license 会单独列在 Readme.opensource 文件中。如果不指定 `-l` 和 `-p` 参数，工具会执行完整 license 提取，输出所有检测到的 license。
+**A:** 使用 `-l` 和 `-p` 参数同时指定，跳过自动检测：
+```bash
+cret -t package.zip -n "Software" -v "1.0.0" -l "Custom-License" -p "LICENSE"
+```
 
 ### Q: 项目有多个 LICENSE 文件，工具如何处理？
-A: 工具会：
+
+**A:** 工具会按优先级处理：
 1. 识别根目录下的所有 license 文件
 2. 识别 LICENSES 目录下的所有文件
-3. 对每个文件提取 license 信息
+3. 按路径优先级选择（根目录 > LICENSES 目录 > 其他目录）
 4. 在 Readme.opensource 中分别列出每个 license
 
-## 输出问题
+### Q: 什么时候应该同时指定 `-l` 和 `-p` 参数？
+
+**A:** 
+- ✅ 明确知道许可证名称和文件位置时
+- ✅ 需要最准确的结果时
+- ✅ 自动检测出现问题需要覆盖时
+
+---
+
+## Copyright相关问题
+
+### Q: 为什么 copyright 信息为空？
+
+**A:** 可能原因及解决方案：
+
+| 原因 | 解决方案 |
+|------|----------|
+| 源代码中没有 copyright 声明 | 检查源文件，补充版权声明 |
+| 声明格式不标准 | 使用标准格式：`Copyright (c) 年份 作者` |
+| 只存在于文档文件中 | 文档中的 copyright 默认被过滤 |
+| 不包含 "copyright" 关键字 | 工具只保留包含关键字的信息 |
+
+**调试方法：**
+```bash
+LOG_LEVEL=DEBUG cret -t package.zip -n "Software" -v "1.0.0"
+# 查看 result.json 中的 copyright 扫描结果
+```
+
+### Q: copyright 信息重复怎么办？
+
+**A:** 工具已内置去重机制。如仍有重复：
+1. 检查是否有多个文件包含相同的 copyright 声明
+2. 使用 `LOG_LEVEL=DEBUG` 查看原始扫描结果
+3. 人工核对并删除 `Readme.opensource` 中的重复项
+
+---
+
+## 输出相关问题
 
 ### Q: 输出文件有哪些？
-A: 工具运行完成后会生成以下文件：
-- `Readme.opensource`：最终输出的许可证声明文件（标准格式）
-- `{被测目标名}_copyright`：copyright 信息文本
-- `{被测目标名}_license`：license 信息文本
-- `result.json`：ScanCode 扫描原始结果（调试用）
 
-### Q: Readme.opensource 文件的格式是什么？
-A: 文件格式如下：
+**A:** 
+| 文件 | 说明 |
+|------|------|
+| `Readme.opensource` | 最终许可证声明文件 |
+| `{target}_copyright` | copyright 信息文本 |
+| `{target}_license` | license 信息文本 |
+| `result.json` | ScanCode 原始扫描结果（调试用） |
+
+### Q: Readme.opensource 格式是什么？
+
+**A:** 
 ```
 Software: 软件名称 版本号
 Copyright Notice(s):
@@ -115,61 +194,50 @@ copyright信息2
 License: MIT
 Full License Text:
 MIT License内容...
-License: Apache-2.0
-Full License Text:
-Apache License内容...
 ```
-
-### Q: 为什么 copyright 信息为空？
-A: 可能的原因：
-1. 源代码中没有 copyright 声明
-2. copyright 声明格式不标准，ScanCode 无法识别
-3. 所有 copyright 信息都在文档文件中，被过滤掉了
-
-使用 `LOG_LEVEL=DEBUG` 查看详细日志以了解具体情况。
-
-## 错误处理
-
-### Q: Windows 环境下删除临时目录失败怎么办？
-A: Windows 系统可能因路径过长导致删除失败。建议：
-1. 修改系统注册表启用长路径支持
-2. 或手动删除临时目录（通常位于目标文件同目录下，名称类似 `xxx-extract`）
 
 ### Q: 执行过程中断，临时文件在哪里？
-A: 如果执行过程中断，临时文件会保留以便调试：
-- 解压的源码目录：通常位于目标文件同目录下，名称类似 `xxx-extract`
-- 扫描结果文件：`result.json`
 
-### Q: 如何查看详细的调试信息？
-A: 使用 `LOG_LEVEL=DEBUG` 环境变量：
-```bash
-LOG_LEVEL=DEBUG cret -t package.zip -n "MySoftware" -v "1.0.0"
-```
+**A:** 
+- 解压目录：目标文件同目录下，名称类似 `xxx-extract`
+- 扫描结果：`result.json`
+- 出错时临时文件会保留以便调试
 
-### Q: 如何只显示错误信息？
-A: 使用 `LOG_LEVEL=QUIET` 环境变量：
-```bash
-LOG_LEVEL=QUIET cret -t package.zip -n "MySoftware" -v "1.0.0"
-```
+---
 
 ## 其他问题
 
 ### Q: 工具支持哪些压缩格式？
-A: 支持的格式包括：`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`
 
-### Q: 可以直接扫描 git clone 后的目录吗？
-A: 可以。直接指定目录路径即可：
+**A:** `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`
+
+### Q: 可以直接扫描目录吗？
+
+**A:** 可以，直接指定目录路径：
 ```bash
-cret -t ./source_dir -n "MySoftware" -v "1.0.0"
+cret -t ./source_dir -n "Software" -v "1.0.0"
 ```
 
-### Q: 如何查看详细的使用指南？
-A: 运行以下命令查看详细使用指南：
+### Q: 如何查看详细使用指南？
+
+**A:** 
 ```bash
 cret --guide
 ```
 
+### Q: Windows 环境下删除临时目录失败？
+
+**A:** 
+1. 修改系统注册表启用长路径支持
+2. 或手动删除 `xxx-extract` 目录
+
 ### Q: 遇到其他问题怎么办？
-A: 1. 使用 `LOG_LEVEL=DEBUG` 查看详细日志
-2. 查看 [DESIGN.md](DESIGN.md) 了解工具的设计逻辑
-3. 向项目提交 Issue，附上详细的错误信息和日志
+
+**A:** 
+1. 使用 `LOG_LEVEL=DEBUG` 查看详细日志
+2. 查看 `result.json` 了解扫描原始结果
+3. 查看 [DESIGN.md](DESIGN.md) 了解设计逻辑
+4. 向项目提交 Issue，附上：
+   - 详细的错误信息
+   - 调试日志输出
+   - 目标文件/目录的基本信息
