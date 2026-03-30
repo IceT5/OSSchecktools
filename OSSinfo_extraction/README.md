@@ -401,6 +401,30 @@ License Expression: apache-2.0
 ...
 ```
 
+## 项目结构
+
+```
+OSSinfo_extraction/
+├── src/ossinfo_extraction/
+│   ├── __init__.py          # 包初始化
+│   ├── __main__.py          # 命令行入口
+│   ├── main.py              # 主入口模块
+│   ├── config.py            # 配置模块（集中管理常量）
+│   ├── prerequisite.py      # 环境检查模块
+│   ├── extract.py           # 源码解压模块
+│   ├── scancode.py          # 扫描模块
+│   ├── parse_and_duplication.py  # Copyright处理模块
+│   ├── license_extraction.py     # License处理模块
+│   ├── readme_opensource.py      # 输出生成模块
+│   ├── cleanup.py           # 清理模块
+│   └── logger.py            # 日志模块
+├── DESIGN.md                # 设计文档
+├── FAQs.md                  # 常见问题
+├── README.md                # 本文档
+├── pyproject.toml           # 项目配置
+└── requirements.txt         # 依赖列表
+```
+
 ## 更多文档
 
 - [设计文档 (DESIGN.md)](DESIGN.md) - 详细设计逻辑和模块说明

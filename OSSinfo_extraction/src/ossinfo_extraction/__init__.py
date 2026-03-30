@@ -23,7 +23,6 @@ from .parse_and_duplication import extract_and_duplicate_copyright
 from .cleanup import cleanup_extract_dir
 
 from .license_extraction import (
-    extract_licenses,
     process_license_params,
     write_license_report,
     is_license_file,
@@ -33,18 +32,14 @@ from .license_extraction import (
 from .readme_opensource import write_readme_opensource
 
 __all__ = [
-    # 核心流程函数
     "check_scancode_available",
     "run_extractcode",
     "run_scancode",
     "extract_and_duplicate_copyright",
     "cleanup_extract_dir",
-    # License 处理函数
-    "extract_licenses",
     "process_license_params",
     "write_license_report",
     "is_license_file",
     "is_license_directory",
-    # 输出函数
     "write_readme_opensource",
 ]

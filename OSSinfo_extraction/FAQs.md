@@ -231,6 +231,25 @@ cret --guide
 1. 修改系统注册表启用长路径支持
 2. 或手动删除 `xxx-extract` 目录
 
+### Q: 如何自定义 License 文件匹配规则？
+
+**A:** 工具的配置常量集中在 `config.py` 模块中，可以根据需要修改：
+
+| 配置常量 | 说明 |
+|----------|------|
+| `LICENSE_FILE_PATTERNS` | License 文件名匹配模式（正则表达式列表） |
+| `LICENSE_EXTENSIONS` | License 文件扩展名集合 |
+| `COPYRIGHT_IGNORED_SUFFIXES` | Copyright 提取时忽略的文件扩展名 |
+
+**示例：添加新的 license 文件名模式**
+```python
+# 在 config.py 中添加
+LICENSE_FILE_PATTERNS = [
+    # ... 现有模式
+    r"^my-custom-license$",  # 添加自定义模式
+]
+```
+
 ### Q: 遇到其他问题怎么办？
 
 **A:** 

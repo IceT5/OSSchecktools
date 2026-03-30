@@ -357,6 +357,25 @@ License处理模块，是工具的核心模块之一。
 
 ---
 
+### config.py - 配置模块
+
+配置模块，集中管理工具的所有配置常量。
+
+**配置项：**
+| 常量名 | 说明 |
+|--------|------|
+| `EXPECTED_SCANCODE_VERSION` | ScanCode 版本要求 |
+| `LICENSE_FILE_PATTERNS` | License 文件名匹配模式（正则表达式列表） |
+| `LICENSE_EXTENSIONS` | License 文件扩展名集合 |
+| `COPYRIGHT_IGNORED_SUFFIXES` | Copyright 提取时忽略的文件扩展名 |
+
+**设计优势：**
+- 配置集中管理，便于维护
+- 支持快速扩展新的 license 模式
+- 方便后续添加更多配置项
+
+---
+
 ### __init__.py - 包初始化
 
 工具包初始化文件，定义包版本信息。

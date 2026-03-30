@@ -22,7 +22,7 @@ from .prerequisite import check_scancode_available
 from .extract import run_extractcode
 from .scancode import run_scancode
 from .parse_and_duplication import extract_and_duplicate_copyright
-from .license_extraction import extract_licenses, process_license_params, write_license_report
+from .license_extraction import process_license_params, write_license_report
 from .readme_opensource import write_readme_opensource
 from .cleanup import cleanup_extract_dir
 
@@ -328,12 +328,17 @@ def main():
         check_scancode_available()
         run_scancode(scan_target, result_json, scan_license=True)
         
+        # 读取scancode结果JSON文件（只读取一次，避免重复IO）
+        import json
+        with result_json.open("r", encoding="utf-8") as f:
+            scan_data = json.load(f)
+        
         # 提取copyright信息
-        copyright_records = extract_and_duplicate_copyright(result_json, output_copyright)
+        copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)
         
         # 处理license信息（始终调用process_license_params以执行校验）
         license_records = process_license_params(
-            result_json=result_json,
+            data=scan_data,
             root_path=scan_target,
             license_name=license_name,
             license_path=license_path,

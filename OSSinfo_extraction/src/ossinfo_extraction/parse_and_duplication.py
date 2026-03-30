@@ -16,30 +16,22 @@ import json
 from pathlib import Path
 
 from .logger import info
+from .config import COPYRIGHT_IGNORED_SUFFIXES
 
 def extract_and_duplicate_copyright(
-    result_json: Path,
+    data: dict,
     output_txt: Path,
 ) -> list:
     """
     从scancode结果中提取copyright信息并写入文件。
     
     Args:
-        result_json: scancode输出的JSON文件路径
+        data: scancode输出的JSON数据（已解析的字典）
         output_txt: 输出文件路径
     
     Returns:
         list: 提取的copyright记录列表
     """
-    ignored_suffixes = {
-        ".md",
-        ".rst",
-        ".txt",
-        ".adoc",
-        ".markdown",
-    }
-    with result_json.open("r", encoding="utf-8") as f:
-        data = json.load(f)
 
     unique_records = set()
     duplicated_results = []
@@ -48,7 +40,7 @@ def extract_and_duplicate_copyright(
         file_path = file_info.get("path", "")
         suffix = Path(file_path).suffix.lower()
 
-        if suffix in ignored_suffixes:
+        if suffix in COPYRIGHT_IGNORED_SUFFIXES:
             continue
 
         for copyright_info in file_info.get("copyrights", []):
