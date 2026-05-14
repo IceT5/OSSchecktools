@@ -253,7 +253,7 @@ def main():
         output_dir = Path(args.output_dir).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
     else:
-        output_dir = target.parent if target.is_file() else target
+        output_dir = target.parent
     
     # 输出文件路径
     result_json = output_dir / "result.json"
@@ -326,12 +326,7 @@ def main():
         
         # 执行scancode扫描（始终扫描license，用于校验用户提供的参数）
         check_scancode_available()
-        run_scancode(scan_target, result_json, scan_license=True)
-        
-        # 读取scancode结果JSON文件（只读取一次，避免重复IO）
-        import json
-        with result_json.open("r", encoding="utf-8") as f:
-            scan_data = json.load(f)
+        scan_data = run_scancode(scan_target, result_json, scan_license=True)
         
         # 提取copyright信息
         copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)

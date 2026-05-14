@@ -21,13 +21,44 @@ from .logger import info, ok, warn, error, debug, error_exit
 from .config import LICENSE_FILE_PATTERNS, LICENSE_EXTENSIONS
 
 
+def _is_exact_license_keyword(stem: str) -> bool:
+    """
+    判断stem是否精确匹配license关键词（不带后缀修饰）。
+    
+    当stem精确匹配 license/copying/copyright 等关键词时，
+    文件名中的后缀部分（如 COPYING.GPL2 中的 .GPL2）是license类型限定符，
+    而非文件格式扩展名，因此应跳过扩展名白名单检查。
+    
+    例如：
+    - COPYING.GPL2 → stem='copying' → True（.GPL2是license类型限定符）
+    - COPYING.md   → stem='copying' → True（.md虽然也是扩展名，但不应阻止匹配）
+    - license_1_0  → stem='license_1_0' → False（有后缀修饰，走正常扩展名检查）
+    
+    Args:
+        stem: 文件名（不含扩展名）的小写形式
+    
+    Returns:
+        bool: 是否是精确的license关键词
+    """
+    exact_keyword_patterns = [
+        r"^license$",
+        r"^copying$",
+        r"^copyright$",
+    ]
+    for pattern in exact_keyword_patterns:
+        if re.match(pattern, stem, re.IGNORECASE):
+            return True
+    return False
+
+
 def is_license_file(filename: str) -> bool:
     """
     判断文件名是否是license相关文件。
     
     检查规则：
-    1. 扩展名必须在允许列表中
-    2. 文件名（不含扩展名）必须匹配已知的license模式
+    1. 文件名（不含扩展名）必须匹配已知的license模式
+    2. 扩展名必须在允许列表中（但当stem精确匹配license关键词时跳过此检查，
+       因为此时后缀是license类型限定符而非文件格式扩展名）
     
     注意：此函数仅检查文件名是否符合规范，不检查路径。
     对于LICENSES目录下命名不规范的文件，由_is_valid_license_path函数处理。
@@ -42,16 +73,26 @@ def is_license_file(filename: str) -> bool:
     stem = Path(filename).stem.lower()
     ext = Path(filename).suffix.lower()
     
-    # 检查扩展名是否在允许列表中（空扩展名始终允许）
+    # 检查文件名是否匹配license模式
+    matched_pattern = None
+    for pattern in LICENSE_FILE_PATTERNS:
+        if re.match(pattern, stem, re.IGNORECASE):
+            matched_pattern = pattern
+            break
+    
+    if not matched_pattern:
+        return False
+    
+    # 当stem精确匹配license关键词（如 COPYING.GPL2 中的 copying）时，
+    # 后缀部分是license类型限定符而非文件格式扩展名，跳过扩展名检查
+    if _is_exact_license_keyword(stem):
+        return True
+    
+    # 其他情况：检查扩展名是否在允许列表中（空扩展名始终允许）
     if ext and ext not in LICENSE_EXTENSIONS:
         return False
     
-    # 检查文件名是否匹配license模式
-    for pattern in LICENSE_FILE_PATTERNS:
-        if re.match(pattern, stem, re.IGNORECASE):
-            return True
-    
-    return False
+    return True
 
 
 def is_license_directory(dirname: str) -> bool:
@@ -389,6 +430,28 @@ def get_best_match_info(file_info: dict) -> Dict[str, Any]:
     }
 
 
+def _is_valid_license_match(file_info: dict) -> bool:
+    """
+    判断ScanCode对文件的license匹配是否有效（非误匹配）。
+    
+    过滤规则：
+    - 有 .LICENSE 规则匹配 → 有效（完整的license文本匹配）
+    - 无 .LICENSE 规则但匹配长度 >= 20 → 有效（较长的片段匹配）
+    - 无 .LICENSE 规则且匹配长度 < 20 → 无效（短文本引用，如说明文档中提到 "MIT"）
+    
+    Args:
+        file_info: scancode文件信息
+    
+    Returns:
+        bool: 是否是有效的license匹配
+    """
+    match_info = get_best_match_info(file_info)
+    if not match_info["has_license_rule"]:
+        if match_info["matched_length"] < 20:
+            return False
+    return True
+
+
 def _find_license_by_name(
     data: dict,
     target_license_files: Set[str],
@@ -539,18 +602,9 @@ def _find_license_by_path(
         detected_spdx = file_info.get("detected_license_expression_spdx", "")
         detected_license = file_info.get("detected_license_expression", "")
         
-        # 获取匹配质量信息
-        match_info = get_best_match_info(file_info)
-        
-        # 过滤误匹配：
-        # 1. 如果没有 .LICENSE 规则匹配，说明不是完整的license文本
-        # 2. 如果匹配长度太短（< 20字符），很可能是误匹配
-        if not match_info["has_license_rule"]:
-            # 没有 .LICENSE 规则，检查匹配长度
-            if match_info["matched_length"] < 20:
-                # 短文本匹配，很可能是误匹配（如 Makefile 中的 "MIT" 关键词）
-                # 返回 None，表示未找到有效的license
-                return None
+        # 过滤误匹配（短文本引用，如说明文档中提到 license 名称）
+        if not _is_valid_license_match(file_info):
+            return None
         
         # 获取最佳matched_text（优先.LICENSE规则）
         matched_text = _get_best_matched_text(file_info)
@@ -756,6 +810,10 @@ def _extract_all_licenses(
         detected_spdx = file_info.get("detected_license_expression_spdx", "")
         
         if not detected_license:
+            continue
+        
+        # 过滤误匹配（短文本引用，如说明文档中提到 license 名称）
+        if not _is_valid_license_match(file_info):
             continue
         
         # 初步去重：同时考虑spdx、license和文件路径，避免同一文件重复添加
