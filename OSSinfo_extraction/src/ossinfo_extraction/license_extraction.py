@@ -509,6 +509,17 @@ def _find_license_by_name(
             # 获取最佳matched_text（优先.LICENSE规则）
             matched_text = _get_best_matched_text(file_info)
             
+            # 判断是否有 .LICENSE 规则匹配来自其他文件（跨文件引用）
+            from_file_self = True
+            for det in file_info.get("license_detections", []):
+                for m in det.get("matches", []):
+                    if m.get("rule_identifier", "").endswith(".LICENSE"):
+                        if m.get("from_file", "") and m["from_file"] != file_path:
+                            from_file_self = False
+                            break
+                if not from_file_self:
+                    break
+            
             unique_key = (detected_spdx, file_path)
             if unique_key not in seen:
                 seen.add(unique_key)
@@ -517,6 +528,7 @@ def _find_license_by_name(
                     "spdx_identifier": detected_spdx,
                     "license_expression": detected_license,
                     "matched_text": matched_text,
+                    "from_file_self": from_file_self,
                 })
     
     # 按路径优先级去重：当有多个相同SPDX标识的license时，只保留优先级最高的
@@ -536,10 +548,15 @@ def _find_license_by_name(
             if len(records) == 1:
                 filtered_records.extend(records)
             else:
-                # 多个记录，按路径优先级排序
+                # 多个记录，按优先级排序：
+                # 1. 路径优先级（根目录优先）
+                # 2. from_file_self 优先（自身包含 license 全文 > 引用其他文件）
                 sorted_records = sorted(
                     records, 
-                    key=lambda r: _get_license_path_priority(r["file"])
+                    key=lambda r: (
+                        _get_license_path_priority(r["file"]),
+                        0 if r.get("from_file_self", True) else 1,
+                    )
                 )
                 # 只取优先级最高的（第一个）
                 filtered_records.append(sorted_records[0])
@@ -825,11 +842,24 @@ def _extract_all_licenses(
         # 获取最佳matched_text（优先.LICENSE规则）
         matched_text = _get_best_matched_text(file_info)
         
+        # 判断是否有 .LICENSE 规则匹配来自其他文件（跨文件引用）
+        # from_file_self=True 表示文件自身包含 license，False 表示 license 来自被引用的其他文件
+        from_file_self = True
+        for det in file_info.get("license_detections", []):
+            for m in det.get("matches", []):
+                if m.get("rule_identifier", "").endswith(".LICENSE"):
+                    if m.get("from_file", "") and m["from_file"] != file_path:
+                        from_file_self = False
+                        break
+            if not from_file_self:
+                break
+        
         license_records.append({
             "file": file_path,
             "spdx_identifier": detected_spdx,
             "license_expression": detected_license,
             "matched_text": matched_text,
+            "from_file_self": from_file_self,
         })
     
     # 按路径优先级去重：当有多个相同(spdx, license)组合的license时，只保留优先级最高的
@@ -849,10 +879,15 @@ def _extract_all_licenses(
             if len(records) == 1:
                 filtered_records.extend(records)
             else:
-                # 多个记录，按路径优先级排序
+                # 多个记录，按优先级排序：
+                # 1. 路径优先级（根目录优先）
+                # 2. from_file_self 优先（自身包含 license 全文 > 引用其他文件）
                 sorted_records = sorted(
                     records, 
-                    key=lambda r: _get_license_path_priority(r["file"])
+                    key=lambda r: (
+                        _get_license_path_priority(r["file"]),
+                        0 if r.get("from_file_self", True) else 1,
+                    )
                 )
                 # 只取优先级最高的（第一个）
                 filtered_records.append(sorted_records[0])
