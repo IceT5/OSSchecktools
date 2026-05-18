@@ -302,12 +302,19 @@ def main():
     try:
         if target.is_file():
             extract_dir = run_extractcode(target)
-            # 检测嵌套目录：如果解压根目录下只有一个子目录，进入该目录作为真正的根目录
+            # 检测嵌套目录：循环递归，只要当前目录下只有一个子目录就继续深入，
+            # 直到找到真正的项目根目录（包含多个文件/子目录的层级）
             scan_target = extract_dir
             try:
-                items = list(extract_dir.iterdir())
-                if len(items) == 1 and items[0].is_dir():
-                    scan_target = items[0]
+                current = extract_dir
+                while True:
+                    items = list(current.iterdir())
+                    if len(items) == 1 and items[0].is_dir():
+                        current = items[0]
+                    else:
+                        break
+                if current != extract_dir:
+                    scan_target = current
                     info(f"Detected nested directory, using as root: {scan_target}")
             except Exception:
                 pass
