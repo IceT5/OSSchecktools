@@ -20,7 +20,7 @@ from pathlib import Path
 from .logger import info, ok, warn, error, debug, has_error, error_exit, register_cleanup_callback, set_software_info
 from .prerequisite import check_scancode_available
 from .extract import run_extractcode
-from .scancode import run_scancode
+from .scancode import run_scancode, _create_text_only_scan_dir, cleanup_text_dir
 from .parse_and_duplication import extract_and_duplicate_copyright
 from .license_extraction import process_license_params, write_license_report
 from .readme_opensource import write_readme_opensource
@@ -225,6 +225,24 @@ Run 'cret --guide' for detailed usage instructions.
         help="Output directory for results / 输出目录 (default: same as target)"
     )
     parser.add_argument(
+        "-j", "--jobs",
+        type=int,
+        default=4,
+        help="Number of parallel ScanCode processes / ScanCode并行进程数 (default: 4)"
+    )
+    parser.add_argument(
+        "--max-in-memory",
+        type=int,
+        default=2000,
+        help="Max files cached in memory by ScanCode / ScanCode内存缓存文件数 (default: 2000)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=60,
+        help="Per-file scan timeout in seconds / 单文件扫描超时时间（秒）(default: 60)"
+    )
+    parser.add_argument(
         "--guide",
         action="store_true",
         help="Show detailed usage guide / 显示详细使用指南"
@@ -264,6 +282,7 @@ def main():
     # 用于清理的变量
     extract_dir = None
     scan_target = target
+    text_dir = None  # 二进制文件过滤后的临时扫描目录
     
     # 定义清理函数
     def cleanup():
@@ -277,6 +296,11 @@ def main():
             output_license.unlink()
         if output_readme.exists():
             output_readme.unlink()
+        # 清理二进制过滤后的临时扫描目录
+        nonlocal text_dir
+        if text_dir:
+            cleanup_text_dir(text_dir)
+            text_dir = None
         # 清理临时目录
         nonlocal extract_dir
         if extract_dir:
@@ -331,9 +355,14 @@ def main():
             # 标准化后的路径用于后续处理
             license_path = normalized_license_path
         
+        # 创建只包含文本文件的临时扫描目录（排除二进制文件以提升扫描速度）
+        text_dir = _create_text_only_scan_dir(scan_target)
+        
         # 执行scancode扫描（始终扫描license，用于校验用户提供的参数）
         check_scancode_available()
-        scan_data = run_scancode(scan_target, result_json, scan_license=True)
+        scan_data = run_scancode(text_dir, result_json, scan_license=True,
+                                 jobs=args.jobs, max_in_memory=args.max_in_memory,
+                                 timeout=args.timeout)
         
         # 提取copyright信息
         copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)
