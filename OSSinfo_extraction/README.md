@@ -99,6 +99,9 @@ cret -t <target> -n <software_name> -v <software_version> [可选参数]
 | `-l` | `--license` | License名称，**必须使用SPDX许可证标识符**（如：MIT, Apache-2.0） |
 | `-p` | `--license-path` | License文件相对路径（相对于代码根目录） |
 | `-o` | `--output-dir` | 输出目录，默认为被测目标同级目录 |
+| `-j` | `--jobs` | ScanCode并行进程数，默认4（内存不足时可降低） |
+| | `--max-in-memory` | ScanCode内存缓存文件数，默认2000；设为0表示不限制内存使用（禁用磁盘缓存）；设为-1表示仅使用磁盘缓存（最小化内存占用） |
+| | `--timeout` | 单文件扫描超时时间（秒），默认60（超时文件将被跳过） |
 | `--guide` | | 显示详细使用指南 |
 
 ### ⚠️ 重要提示：License名称必须使用SPDX标识符
@@ -126,6 +129,9 @@ cret -t package.zip -n "MySoftware" -v "1.0.0" -l "MIT" -p "LICENSE"
 
 # 指定输出目录
 cret -t package.zip -n "MySoftware" -v "1.0.0" -o "./output"
+
+# 调整ScanCode性能参数（适用于大项目或内存有限的机器）
+cret -t package.zip -n "MySoftware" -v "1.0.0" -j 2 --max-in-memory 1000 --timeout 30
 
 # 显示详细使用指南
 cret --guide
