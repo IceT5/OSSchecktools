@@ -225,6 +225,18 @@ Run 'cret --guide' for detailed usage instructions.
         help="Output directory for results / 输出目录 (default: same as target)"
     )
     parser.add_argument(
+        "-j", "--jobs",
+        type=int,
+        default=4,
+        help="Number of parallel ScanCode processes / ScanCode并行进程数 (default: 4)"
+    )
+    parser.add_argument(
+        "--max-in-memory",
+        type=int,
+        default=2000,
+        help="Max files cached in memory by ScanCode / ScanCode内存缓存文件数 (default: 2000)"
+    )
+    parser.add_argument(
         "--guide",
         action="store_true",
         help="Show detailed usage guide / 显示详细使用指南"
@@ -333,7 +345,8 @@ def main():
         
         # 执行scancode扫描（始终扫描license，用于校验用户提供的参数）
         check_scancode_available()
-        scan_data = run_scancode(scan_target, result_json, scan_license=True)
+        scan_data = run_scancode(scan_target, result_json, scan_license=True,
+                                 jobs=args.jobs, max_in_memory=args.max_in_memory)
         
         # 提取copyright信息
         copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)

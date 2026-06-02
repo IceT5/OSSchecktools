@@ -20,7 +20,7 @@ from pathlib import Path
 from .logger import info, warn, cmd as log_cmd
 
 
-def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8, scan_license: bool = False):
+def run_scancode(scan_target: Path, result_json: Path, jobs: int = 4, scan_license: bool = False, max_in_memory: int = 2000):
     """
     Run ScanCode Toolkit.
     
@@ -31,6 +31,7 @@ def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8, scan_licen
         result_json: 输出JSON文件路径
         jobs: 并行任务数
         scan_license: 是否扫描license信息
+        max_in_memory: 内存中缓存的文件扫描详情数量
     
     Returns:
         dict: 解析后的ScanCode JSON结果数据
@@ -47,6 +48,8 @@ def run_scancode(scan_target: Path, result_json: Path, jobs: int = 8, scan_licen
         str(scan_target),
         "-n",
         str(jobs),
+        "--max-in-memory",
+        str(max_in_memory),
     ]
     
     # 添加license扫描参数
