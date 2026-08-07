@@ -43,22 +43,24 @@ def run_extractcode(target: str) -> Path:
     info("Running extractcode:")
     log_cmd(" ".join(cmd))
 
-    result = subprocess.run(
-        cmd,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-        env=env,
-    )
-
-    if result.returncode != 0:
-        raise RuntimeError(f"extractcode failed with exit code {result.returncode}")
-
-    extract_dir = archive.parent / f"{archive.name}-extract"
-
-    if not extract_dir.exists():
-        raise RuntimeError(
-            f"Expected extract directory not found: {extract_dir}"
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            env=env,
         )
-    
-    shutil.rmtree(custom_tmp)
+
+        if result.returncode != 0:
+            raise RuntimeError(f"extractcode failed with exit code {result.returncode}")
+
+        extract_dir = archive.parent / f"{archive.name}-extract"
+
+        if not extract_dir.exists():
+            raise RuntimeError(
+                f"Expected extract directory not found: {extract_dir}"
+            )
+    finally:
+        shutil.rmtree(custom_tmp, ignore_errors=True)
+
     return extract_dir

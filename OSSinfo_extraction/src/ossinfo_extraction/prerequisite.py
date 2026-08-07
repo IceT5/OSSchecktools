@@ -14,16 +14,14 @@
 
 import subprocess
 
+from .config import EXPECTED_SCANCODE_VERSION
 from .logger import ok, warn
-
-# 期望的 scancode-toolkit 版本
-EXPECTED_SCANCODE_VERSION = "32.5.0"
 
 
 def check_scancode_available():
     """
     Check whether scancode command is available and check version.
-    
+
     检查 scancode 命令是否可用，如果版本不匹配则告警但不阻止运行。
     """
     try:
@@ -41,7 +39,7 @@ def check_scancode_available():
         )
 
     version_output = result.stdout.strip()
-    
+
     # 检查版本是否匹配，不匹配告警但不阻止运行
     if EXPECTED_SCANCODE_VERSION not in version_output:
         warn(
