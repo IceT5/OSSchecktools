@@ -23,19 +23,19 @@ from .logger import info, warn, cmd as log_cmd
 def run_scancode(scan_target: Path, result_json: Path, jobs: int = 4, scan_license: bool = False, max_in_memory: int = 2000):
     """
     Run ScanCode Toolkit.
-    
+
     直接调用 scancode 命令进行扫描。
-    
+
     Args:
         scan_target: 要扫描的目标路径
         result_json: 输出JSON文件路径
         jobs: 并行任务数
         scan_license: 是否扫描license信息
         max_in_memory: 内存中缓存的文件扫描详情数量
-    
+
     Returns:
         dict: 解析后的ScanCode JSON结果数据
-    
+
     Raises:
         RuntimeError: ScanCode执行失败且无法生成有效结果
     """
@@ -51,7 +51,7 @@ def run_scancode(scan_target: Path, result_json: Path, jobs: int = 4, scan_licen
         "--max-in-memory",
         str(max_in_memory),
     ]
-    
+
     # 添加license扫描参数
     if scan_license:
         cmd.insert(1, "-l")  # 扫描license
@@ -78,9 +78,9 @@ def run_scancode(scan_target: Path, result_json: Path, jobs: int = 4, scan_licen
                     return data
             except (json.JSONDecodeError, OSError):
                 pass
-        
+
         raise RuntimeError(f"ScanCode failed with exit code {result.returncode}")
-    
+
     # 正常退出，读取结果
     with result_json.open("r", encoding="utf-8") as f:
         return json.load(f)

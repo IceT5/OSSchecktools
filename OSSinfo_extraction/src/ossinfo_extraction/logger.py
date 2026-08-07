@@ -55,7 +55,7 @@ _software_version = ""
 def register_cleanup_callback(callback) -> None:
     """
     注册清理回调函数。
-    
+
     Args:
         callback: 清理函数，无参数，在error退出时调用
     """
@@ -66,7 +66,7 @@ def register_cleanup_callback(callback) -> None:
 def set_software_info(name: str, version: str) -> None:
     """
     设置软件名称和版本信息。
-    
+
     Args:
         name: 软件名称
         version: 软件版本
@@ -79,7 +79,7 @@ def set_software_info(name: str, version: str) -> None:
 def set_log_level(level: int) -> None:
     """
     设置日志级别。
-    
+
     Args:
         level: 日志级别常量 (DEBUG, INFO, QUIET)
     """
@@ -90,7 +90,7 @@ def set_log_level(level: int) -> None:
 def get_log_level() -> int:
     """
     获取当前日志级别。
-    
+
     Returns:
         int: 当前日志级别
     """
@@ -142,9 +142,9 @@ def error(message: str) -> None:
 def error_exit(message: str, exit_code: int = 1) -> None:
     """
     输出错误日志并立即退出程序。
-    
+
     如果注册了清理回调函数，会在退出前执行清理。
-    
+
     Args:
         message: 错误信息
         exit_code: 退出码，默认为1
@@ -152,7 +152,7 @@ def error_exit(message: str, exit_code: int = 1) -> None:
     global _error_count
     _error_count += 1
     print(f"[ERROR] {message}")
-    
+
     # 输出包含软件名称和版本的失败提示
     if _software_name and _software_version:
         print(f"[ERROR] {_software_name} {_software_version} Readme.opensource生成失败，请修改完成后重新执行")
@@ -160,21 +160,21 @@ def error_exit(message: str, exit_code: int = 1) -> None:
     else:
         print(f"[ERROR] Readme.opensource生成失败，请修改完成后重新执行")
         print(f"[ERROR] Readme.opensource generation failed. Please fix the issue and try again.")
-    
+
     # 执行清理回调
     if _cleanup_callback is not None:
         try:
             _cleanup_callback()
         except Exception as e:
             print(f"[ERROR] Cleanup failed: {e}")
-    
+
     sys.exit(exit_code)
 
 
 def has_error() -> bool:
     """
     检查是否有过错误日志。
-    
+
     Returns:
         bool: 是否有过错误
     """

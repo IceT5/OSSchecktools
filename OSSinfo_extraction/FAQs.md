@@ -44,7 +44,7 @@
 
 ### Q: 工具支持哪些操作系统？
 
-**A:** 
+**A:**
 - **推荐**：Ubuntu 22.04，Python 3.10/3.11
 - **Windows**：可能出现临时目录路径过长导致删除失败的问题
 
@@ -65,7 +65,7 @@
 
 ### Q: 如何安装工具？
 
-**A:** 
+**A:**
 ```bash
 cd OSSinfo_extraction
 pip install -e .
@@ -103,7 +103,7 @@ cret -t package.zip -n "Software" -v "1.0.0" -l "LGPL-3.0"
 
 ### Q: 使用 `-l` 参数时提示许可证未找到？
 
-**A:** 
+**A:**
 1. **确认使用 SPDX 标识符**：必须使用标准短名称，如 `MIT`、`Apache-2.0`、`GPL-3.0-only`
 2. **查看 ScanCode 支持的许可证列表**：
    ```bash
@@ -135,7 +135,7 @@ cret -t package.zip -n "Software" -v "1.0.0" -l "Custom-License" -p "LICENSE"
 
 ### Q: 什么时候应该同时指定 `-l` 和 `-p` 参数？
 
-**A:** 
+**A:**
 - ✅ 明确知道许可证名称和文件位置时
 - ✅ 需要最准确的结果时
 - ✅ 自动检测出现问题需要覆盖时
@@ -174,7 +174,7 @@ LOG_LEVEL=DEBUG cret -t package.zip -n "Software" -v "1.0.0"
 
 ### Q: 输出文件有哪些？
 
-**A:** 
+**A:**
 | 文件 | 说明 |
 |------|------|
 | `Readme.opensource` | 最终许可证声明文件 |
@@ -184,7 +184,7 @@ LOG_LEVEL=DEBUG cret -t package.zip -n "Software" -v "1.0.0"
 
 ### Q: Readme.opensource 格式是什么？
 
-**A:** 
+**A:**
 ```
 Software: 软件名称 版本号
 Copyright Notice(s):
@@ -198,7 +198,7 @@ MIT License内容...
 
 ### Q: 执行过程中断，临时文件在哪里？
 
-**A:** 
+**A:**
 - 解压目录：目标文件同目录下，名称类似 `xxx-extract`
 - 扫描结果：`result.json`
 - 出错时临时文件会保留以便调试
@@ -220,14 +220,14 @@ cret -t ./source_dir -n "Software" -v "1.0.0"
 
 ### Q: 如何查看详细使用指南？
 
-**A:** 
+**A:**
 ```bash
 cret --guide
 ```
 
 ### Q: Windows 环境下删除临时目录失败？
 
-**A:** 
+**A:**
 1. 修改系统注册表启用长路径支持
 2. 或手动删除 `xxx-extract` 目录
 
@@ -252,7 +252,7 @@ LICENSE_FILE_PATTERNS = [
 
 ### Q: 遇到其他问题怎么办？
 
-**A:** 
+**A:**
 1. 使用 `LOG_LEVEL=DEBUG` 查看详细日志
 2. 查看 `result.json` 了解扫描原始结果
 3. 查看 [DESIGN.md](DESIGN.md) 了解设计逻辑
