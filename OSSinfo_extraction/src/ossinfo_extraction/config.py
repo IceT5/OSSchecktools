@@ -24,6 +24,8 @@ LICENSE_FILE_PATTERNS = [
     # 通用 license 文件名
     r"^license$",           # LICENSE, license
     r"^license[-_.].*",     # LICENSE-MIT, LICENSE.APACHE, LICENSE.MIT, license.txt
+    r"^licence$",           # LICENCE, licence（英式拼写，如tqdm的LICENCE）
+    r"^licence[-_.].*",     # LICENCE.txt, LICENCE-MIT
     r"^copying$",           # COPYING, copying
     r"^copying[-_.].*",     # COPYING.LESSER, COPYING.GPL, COPYING-3.0
     r"^copyright$",         # COPYRIGHT, copyright

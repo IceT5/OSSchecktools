@@ -170,6 +170,72 @@ or directories and generates a standardized Readme.opensource file.
     print(guide)
 
 
+def _add_required_args(parser):
+    """添加必填参数"""
+    parser.add_argument(
+        "-t", "--target",
+        required=True,
+        help="Target file or directory to analyze / 目标文件或目录路径 (e.g., package.zip)"
+    )
+    parser.add_argument(
+        "-n", "--name",
+        required=True,
+        help="Software name / 软件名称 (required)"
+    )
+    parser.add_argument(
+        "-v", "--version",
+        required=True,
+        help="Software version / 软件版本号 (required)"
+    )
+
+
+def _add_license_args(parser):
+    """添加license相关可选参数"""
+    parser.add_argument(
+        "-l", "--license",
+        dest="license_name",
+        default=None,
+        help="License name (SPDX identifier) / 许可证名称，如 MIT, Apache-2.0"
+    )
+    parser.add_argument(
+        "-p", "--license-path",
+        dest="license_path",
+        default=None,
+        help="Relative path to license file / 许可证文件相对路径"
+    )
+
+
+def _add_output_args(parser):
+    """添加输出相关可选参数"""
+    parser.add_argument(
+        "-o", "--output-dir",
+        dest="output_dir",
+        default=None,
+        help="Output directory for results / 输出目录 (default: same as target)"
+    )
+    parser.add_argument(
+        "--guide",
+        action="store_true",
+        help="Show detailed usage guide / 显示详细使用指南"
+    )
+
+
+def _add_scancode_args(parser):
+    """添加ScanCode相关可选参数"""
+    parser.add_argument(
+        "-j", "--jobs",
+        type=int,
+        default=4,
+        help="Number of parallel ScanCode processes / ScanCode并行进程数 (default: 4)"
+    )
+    parser.add_argument(
+        "--max-in-memory",
+        type=int,
+        default=2000,
+        help="Max files cached in memory by ScanCode / ScanCode内存缓存文件数 (default: 2000)"
+    )
+
+
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
@@ -188,59 +254,10 @@ Run 'cret --guide' for detailed usage instructions.
         """
     )
 
-    # 必填参数
-    parser.add_argument(
-        "-t", "--target",
-        required=True,
-        help="Target file or directory to analyze / 目标文件或目录路径 (e.g., package.zip)"
-    )
-    parser.add_argument(
-        "-n", "--name",
-        required=True,
-        help="Software name / 软件名称 (required)"
-    )
-    parser.add_argument(
-        "-v", "--version",
-        required=True,
-        help="Software version / 软件版本号 (required)"
-    )
-
-    # 可选参数
-    parser.add_argument(
-        "-l", "--license",
-        dest="license_name",
-        default=None,
-        help="License name (SPDX identifier) / 许可证名称，如 MIT, Apache-2.0"
-    )
-    parser.add_argument(
-        "-p", "--license-path",
-        dest="license_path",
-        default=None,
-        help="Relative path to license file / 许可证文件相对路径"
-    )
-    parser.add_argument(
-        "-o", "--output-dir",
-        dest="output_dir",
-        default=None,
-        help="Output directory for results / 输出目录 (default: same as target)"
-    )
-    parser.add_argument(
-        "-j", "--jobs",
-        type=int,
-        default=4,
-        help="Number of parallel ScanCode processes / ScanCode并行进程数 (default: 4)"
-    )
-    parser.add_argument(
-        "--max-in-memory",
-        type=int,
-        default=2000,
-        help="Max files cached in memory by ScanCode / ScanCode内存缓存文件数 (default: 2000)"
-    )
-    parser.add_argument(
-        "--guide",
-        action="store_true",
-        help="Show detailed usage guide / 显示详细使用指南"
-    )
+    _add_required_args(parser)
+    _add_license_args(parser)
+    _add_output_args(parser)
+    _add_scancode_args(parser)
 
     # 先检查是否只是要显示指南（在解析必填参数之前）
     if "--guide" in sys.argv:
@@ -252,8 +269,140 @@ Run 'cret --guide' for detailed usage instructions.
     return args
 
 
+def _log_software_info(software_name, software_version, license_name, license_path):
+    # 设置软件信息（用于错误日志输出）
+    set_software_info(software_name, software_version)
+
+    info(f"Software Name: {software_name}")
+    info(f"Software Version: {software_version}")
+    info(f"License Name: {license_name or 'Not provided'}")
+    info(f"License Path: {license_path or 'Not provided'}")
+
+
+def _scan_source(scan_target, result_json, jobs, max_in_memory):
+    check_scancode_available()
+    # run_scancode直接返回解析后的JSON数据（扫描失败但已生成部分有效结果时，告警后继续）
+    return run_scancode(scan_target, result_json, scan_license=True,
+                        jobs=jobs, max_in_memory=max_in_memory)
+
+
+def _write_reports(scan_data, scan_target, software_info, output_files, license_path, license_full_path):
+    software_name, software_version, license_name = software_info
+    _, output_copyright, output_license, output_readme = output_files
+    # 提取copyright信息
+    copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)
+
+    # 处理license信息（始终调用process_license_params以执行校验）
+    license_records = process_license_params(
+        data=scan_data,
+        root_path=scan_target,
+        license_name=license_name,
+        license_path=license_path,
+        license_full_path=license_full_path,
+    )
+
+    # 检查是否有错误发生（用于非error_exit方式的错误）
+    if has_error():
+        error_exit("Errors occurred during processing, aborting.")
+
+    # 写入license报告
+    write_license_report(
+        output_txt=output_license,
+        software_name=software_name,
+        software_version=software_version,
+        license_records=license_records,
+    )
+
+    # 生成Readme.opensource文件
+    write_readme_opensource(
+        output_path=output_readme,
+        software_name=software_name,
+        software_version=software_version,
+        copyright_records=copyright_records,
+        license_records=license_records,
+        root_path=scan_target,
+    )
+
+
+def _single_subdir(current: Path):
+    """
+    若目录下仅包含一个子目录则返回该子目录，否则返回None。
+
+    Args:
+        current: 待检查的目录
+
+    Returns:
+        Path或None: 唯一的子目录；不存在唯一子目录时返回None
+    """
+    items = list(current.iterdir())
+    if len(items) == 1 and items[0].is_dir():
+        return items[0]
+    return None
+
+
+def _detect_nested_root(extract_dir: Path) -> Path:
+    """
+    循环递归检测嵌套目录：只要当前目录下只有一个子目录就继续深入，
+    直到找到真正的项目根目录（包含多个文件/子目录的层级）。
+
+    Args:
+        extract_dir: 解压后的根目录
+
+    Returns:
+        Path: 检测到的项目根目录（可能等于extract_dir）
+    """
+    current = extract_dir
+    try:
+        while True:
+            sub = _single_subdir(current)
+            if sub is None:
+                break
+            current = sub
+    except Exception:
+        # 检测过程出现异常时放弃嵌套检测，保持解压根目录
+        return extract_dir
+    return current
+
+
+def _prepare_scan_target(target):
+    extract_dir = None
+    scan_target = target
+    if target.is_file():
+        extract_dir = run_extractcode(target)
+        # 检测嵌套目录：循环递归，直到找到真正的项目根目录
+        scan_target = extract_dir
+        nested_root = _detect_nested_root(extract_dir)
+        if nested_root != extract_dir:
+            scan_target = nested_root
+            info(f"Detected nested directory, using as root: {scan_target}")
+
+    return extract_dir, scan_target
+
+
+def _normalize_license_path(scan_target, license_path):
+    # 验证用户提供的license路径是否存在
+    if license_path:
+        # 标准化路径：移除前导斜杠，统一路径分隔符
+        # 避免 /LICENSES/MIT.txt 被解析为绝对路径
+        normalized_license_path = license_path.lstrip("/").replace("\\", "/")
+        license_full_path = (scan_target / normalized_license_path).resolve()
+        try:
+            license_full_path.relative_to(scan_target.resolve())
+        except ValueError:
+            error_exit(f"License file must be inside the target: {license_path}")
+        if not license_full_path.is_file():
+            error_exit(f"License file not found: {license_path}")
+
+        # 相对路径用于日志提示，绝对路径用于后续精确匹配，避免重复进行路径清理
+        return normalized_license_path, license_full_path
+
+    return license_path, None
+
+
 def main():
     args = parse_args()
+    software_name, software_version = args.name, args.version
+    license_name, license_path = args.license_name, args.license_path
 
     # 解析目标路径
     target = Path(args.target).resolve()
@@ -272,6 +421,7 @@ def main():
     output_copyright = output_dir / f"{target.stem}_copyright"
     output_license = output_dir / f"{target.stem}_license"
     output_readme = output_dir / "Readme.opensource"
+    output_files = (result_json, output_copyright, output_license, output_readme)
 
     # 用于清理的变量
     extract_dir = None
@@ -298,88 +448,17 @@ def main():
     register_cleanup_callback(cleanup)
 
     # 软件信息
-    software_name = args.name
-    software_version = args.version
-    license_name = args.license_name
-    license_path = args.license_path
-
-    # 设置软件信息（用于错误日志输出）
-    set_software_info(software_name, software_version)
-
-    info(f"Software Name: {software_name}")
-    info(f"Software Version: {software_version}")
-    info(f"License Name: {license_name or 'Not provided'}")
-    info(f"License Path: {license_path or 'Not provided'}")
+    _log_software_info(software_name, software_version, license_name, license_path)
 
     try:
-        if target.is_file():
-            extract_dir = run_extractcode(target)
-            # 检测嵌套目录：循环递归，只要当前目录下只有一个子目录就继续深入，
-            # 直到找到真正的项目根目录（包含多个文件/子目录的层级）
-            scan_target = extract_dir
-            try:
-                current = extract_dir
-                while True:
-                    items = list(current.iterdir())
-                    if len(items) == 1 and items[0].is_dir():
-                        current = items[0]
-                    else:
-                        break
-                if current != extract_dir:
-                    scan_target = current
-                    info(f"Detected nested directory, using as root: {scan_target}")
-            except Exception:
-                pass
+        extract_dir, scan_target = _prepare_scan_target(target)
 
-        # 验证用户提供的license路径是否存在
-        if license_path:
-            # 标准化路径：移除前导斜杠，统一路径分隔符
-            # 避免 /LICENSES/MIT.txt 被解析为绝对路径
-            normalized_license_path = license_path.lstrip("/").replace("\\", "/")
-            license_full_path = scan_target / normalized_license_path
-            if not license_full_path.exists():
-                error_exit(f"License file not found: {license_path}")
+        license_path, license_full_path = _normalize_license_path(scan_target, license_path)
 
-            # 标准化后的路径用于后续处理
-            license_path = normalized_license_path
-
-        # 执行scancode扫描（始终扫描license，用于校验用户提供的参数）
-        check_scancode_available()
-        scan_data = run_scancode(scan_target, result_json, scan_license=True,
-                                 jobs=args.jobs, max_in_memory=args.max_in_memory)
-
-        # 提取copyright信息
-        copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)
-
-        # 处理license信息（始终调用process_license_params以执行校验）
-        license_records = process_license_params(
-            data=scan_data,
-            root_path=scan_target,
-            license_name=license_name,
-            license_path=license_path,
-        )
-
-        # 检查是否有错误发生（用于非error_exit方式的错误）
-        if has_error():
-            error_exit("Errors occurred during processing, aborting.")
-
-        # 写入license报告
-        write_license_report(
-            output_txt=output_license,
-            software_name=software_name,
-            software_version=software_version,
-            license_records=license_records,
-        )
-
-        # 生成Readme.opensource文件
-        write_readme_opensource(
-            output_path=output_readme,
-            software_name=software_name,
-            software_version=software_version,
-            copyright_records=copyright_records,
-            license_records=license_records,
-            root_path=scan_target,
-        )
+        scan_data = _scan_source(scan_target, result_json, args.jobs, args.max_in_memory)
+        _write_reports(scan_data, scan_target,
+                       (software_name, software_version, license_name), output_files,
+                       license_path, license_full_path)
 
     except Exception as e:
         error("Pipeline failed, extracted directory will be kept for debugging.")

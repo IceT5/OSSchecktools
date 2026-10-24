@@ -35,6 +35,121 @@ from typing import List, Dict, Any
 from .logger import info, debug
 
 
+def _read_license_text(full_license_path: Path):
+    """
+    读取license文件全文。
+
+    Args:
+        full_license_path: license文件完整路径
+
+    Returns:
+        str或None: 文件全文；读取失败时返回None
+    """
+    try:
+        with full_license_path.open("r", encoding="utf-8", errors="replace") as lf:
+            return lf.read()
+    except Exception as e:
+        debug(f"Failed to read license file {full_license_path}: {e}")
+        return None
+
+
+def _write_license_file_content(f, license_file_path: str, root_path: Path) -> bool:
+    """
+    尝试从root_path读取license文件全文并写入。
+
+    Args:
+        f: 已打开的输出文件对象
+        license_file_path: license文件相对路径
+        root_path: 项目根目录路径
+
+    Returns:
+        bool: 是否成功读取并写入了license文件内容
+    """
+    license_content_found = False
+    if not (license_file_path and root_path):
+        return license_content_found
+
+    # 清理路径：去掉可能存在的扫描前缀目录
+    # scancode路径可能类似: json-develop.zip-extract/json-develop/LICENSES/xxx.txt
+    # 我们需要提取实际的相对路径部分
+    cleaned_license_path = _clean_license_path(license_file_path, root_path)
+
+    # 尝试多种路径组合
+    possible_paths = _get_possible_license_paths(root_path, cleaned_license_path)
+
+    for full_license_path in possible_paths:
+        debug(f"Trying license file path: {full_license_path}")
+        if not (full_license_path.exists() and full_license_path.is_file()):
+            debug(f"Path does not exist or is not a file: {full_license_path}")
+            continue
+        license_content = _read_license_text(full_license_path)
+        if license_content is None:
+            continue
+        f.write(license_content)
+        if not license_content.endswith("\n"):
+            f.write("\n")
+        f.write("\n")  # 添加空行，改善多个license时的阅读体验
+        license_content_found = True
+        debug(f"Successfully read license file: {full_license_path}")
+        break
+
+    return license_content_found
+
+
+def _write_license_record(f, record: Dict[str, Any], root_path: Path) -> None:
+    """
+    写入单条license记录（License名称 + Full License Text）。
+
+    优先读取license文件全文；读取失败时回退使用matched_text。
+
+    Args:
+        f: 已打开的输出文件对象
+        record: license记录
+        root_path: 项目根目录路径（用于读取license文件内容）
+    """
+    license_name = record.get("spdx_identifier", "Unknown")
+    license_file_path = record.get("file", "")
+
+    # 输出License名称
+    f.write(f"License: {license_name}\n")
+
+    # 输出Full License Text
+    f.write("Full License Text:\n")
+
+    # 尝试读取license文件内容
+    if _write_license_file_content(f, license_file_path, root_path):
+        return
+
+    # 如果文件读取失败，尝试使用matched_text
+    matched_text = record.get("matched_text", "")
+    if matched_text:
+        f.write(matched_text)
+        if not matched_text.endswith("\n"):
+            f.write("\n")
+        f.write("\n")  # 添加空行，改善多个license时的阅读体验
+    else:
+        f.write("[No license text available]\n")
+        f.write("\n")  # 添加空行，改善多个license时的阅读体验
+
+
+def _write_copyright_section(f, copyright_records: List[str]) -> None:
+    """
+    写入Copyright Notice(s)段落。
+
+    Args:
+        f: 已打开的输出文件对象
+        copyright_records: copyright记录列表
+    """
+    f.write("Copyright Notice(s):\n")
+    if not copyright_records:
+        f.write("No copyright information found.\n")
+        return
+    for copyright_text in copyright_records:
+        cleaned_text = copyright_text.strip()
+        if cleaned_text:
+            f.write(f"{cleaned_text}\n")
+
+
 def write_readme_opensource(
     output_path: Path,
     software_name: str,
@@ -72,70 +187,12 @@ def write_readme_opensource(
         f.write(f"Software: {software_name} {software_version}\n")
 
         # 第二步：输出Copyright Notice(s)
-        f.write("Copyright Notice(s):\n")
-
-        if copyright_records:
-            for copyright_text in copyright_records:
-                # 清理每行并写入
-                cleaned_text = copyright_text.strip()
-                if cleaned_text:
-                    f.write(f"{cleaned_text}\n")
-        else:
-            f.write("No copyright information found.\n")
+        _write_copyright_section(f, copyright_records)
 
         # 第三步：输出License信息（每个license重复）
         if license_records:
             for record in license_records:
-                license_name = record.get("spdx_identifier", "Unknown")
-                license_file_path = record.get("file", "")
-
-                # 输出License名称
-                f.write(f"License: {license_name}\n")
-
-                # 输出Full License Text
-                f.write("Full License Text:\n")
-
-                # 尝试读取license文件内容
-                license_content_found = False
-
-                if license_file_path and root_path:
-                    # 清理路径：去掉可能存在的扫描前缀目录
-                    # scancode路径可能类似: json-develop.zip-extract/json-develop/LICENSES/xxx.txt
-                    # 我们需要提取实际的相对路径部分
-                    cleaned_license_path = _clean_license_path(license_file_path, root_path)
-
-                    # 尝试多种路径组合
-                    possible_paths = _get_possible_license_paths(root_path, cleaned_license_path)
-
-                    for full_license_path in possible_paths:
-                        debug(f"Trying license file path: {full_license_path}")
-                        if full_license_path.exists() and full_license_path.is_file():
-                            try:
-                                with full_license_path.open("r", encoding="utf-8", errors="replace") as lf:
-                                    license_content = lf.read()
-                                    f.write(license_content)
-                                    if not license_content.endswith("\n"):
-                                        f.write("\n")
-                                    f.write("\n")  # 添加空行，改善多个license时的阅读体验
-                                    license_content_found = True
-                                    debug(f"Successfully read license file: {full_license_path}")
-                                    break
-                            except Exception as e:
-                                debug(f"Failed to read license file {full_license_path}: {e}")
-                        else:
-                            debug(f"Path does not exist or is not a file: {full_license_path}")
-
-                # 如果文件读取失败，尝试使用matched_text
-                if not license_content_found:
-                    matched_text = record.get("matched_text", "")
-                    if matched_text:
-                        f.write(matched_text)
-                        if not matched_text.endswith("\n"):
-                            f.write("\n")
-                        f.write("\n")  # 添加空行，改善多个license时的阅读体验
-                    else:
-                        f.write("[No license text available]\n")
-                        f.write("\n")  # 添加空行，改善多个license时的阅读体验
+                _write_license_record(f, record, root_path)
         else:
             f.write("License: No license information found.\n")
             f.write("Full License Text:\n")

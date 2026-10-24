@@ -52,7 +52,7 @@ def extract_and_duplicate_copyright(
 
             value_stripped = value.strip()
 
-            if "copyright" not in value_stripped.lower():
+            if not value_stripped:
                 continue
 
             if value_stripped not in unique_records:
