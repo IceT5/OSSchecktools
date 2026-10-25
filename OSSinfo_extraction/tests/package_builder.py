@@ -223,6 +223,80 @@ def empty_dir_entries() -> list:
     return [Entry(f"{PKG_ROOT}/.placeholder", "\n", seq=0)]
 
 
+def chinese_entries(top: str = "项目库-1.0") -> list:
+    """生成中文目录/文件名的包（编码与嵌套检测的综合边界）。"""
+    def rel(path: str) -> str:
+        return f"{top}/{path}"
+
+    return [
+        Entry(rel("LICENSE"), license_text("MIT"), seq=0),
+        Entry(rel("源码/主程序.c"), "/* Copyright (c) 2024 中文作者 */\nint main(){}\n", seq=1),
+        Entry(rel("说明.md"), "# 项目说明\n", seq=2),
+    ]
+
+
+def mismatch_entries(top: str = "mismatch-1.0") -> list:
+    """生成文件名与内容不一致、行尾/编码变体的包。
+
+    - LICENSE文件名装Apache全文：提取以内容为准
+    - crlf.txt：CRLF行尾（Windows打包常见）
+    - bom.txt：UTF-8 BOM前缀
+    - empty.txt：0字节
+    """
+    def rel(path: str) -> str:
+        return f"{top}/{path}"
+
+    apache = license_text("Apache-2.0")
+    return [
+        Entry(rel("LICENSE"), apache, seq=0),
+        Entry(rel("crlf.txt"), apache.replace("\n", "\r\n"), seq=1),
+        Entry(rel("bom.txt"), "﻿" + apache, seq=2),
+        Entry(rel("empty.txt"), "", seq=3),
+    ]
+
+
+def spdx_only_entries(top: str = "spdxsrc-1.0") -> list:
+    """生成无license文件、仅源码内SPDX声明行的包（现代项目形态）。"""
+    def rel(path: str) -> str:
+        return f"{top}/{path}"
+
+    return [
+        Entry(rel("src/a.c"), "// SPDX-License-Identifier: MIT\nint a(){}\n", seq=0),
+        Entry(rel("src/b.c"), "// SPDX-License-Identifier: Apache-2.0\nint b(){}\n", seq=1),
+        Entry(rel("README.md"), "spdx-only package\n", seq=2),
+    ]
+
+
+def make_corrupt_zip(dest: Path) -> Path:
+    """损坏zip：非法数据（非空但无法解出任何内容）。"""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(b"PK" + b"\x00" * 100)
+    return dest
+
+
+def make_empty_zip(dest: Path) -> Path:
+    """空zip：0个条目。"""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(dest, "w"):
+        pass
+    return dest
+
+
+def make_nested_archive(dest: Path) -> Path:
+    """嵌套压缩包：tar.gz内封装zip（流水线以--shallow解压，内层zip
+    不会被递归解开，用于固化内层license不提取的现状边界）。"""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as z:
+        z.writestr("nestedlib-1.0/LICENSE", license_text("MIT"))
+    with tarfile.open(dest, "w:gz") as t:
+        data = inner.getvalue()
+        info = tarfile.TarInfo(name="inner.zip")
+        info.size = len(data)
+        t.addfile(info, io.BytesIO(data))
+    return dest
+
+
 def make_archive(entries: list, dest: Path) -> Path:
     """按dest后缀打包条目为真实压缩包。
 
