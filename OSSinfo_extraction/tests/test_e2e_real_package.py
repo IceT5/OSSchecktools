@@ -172,6 +172,15 @@ class TestLicenseParams:
         run_extract(sample_zip, tmp_path, "-p", "docs/LICENSE")
         assert "License: BSD-3-Clause\n" in readme_of(tmp_path)
 
+    def test_path_outside_auto_detection_rules(self, sample_zip, tmp_path):
+        """-p指向不符合自动识别规则的文件（NOTICE：文件名不在license
+        模式内、位置为包根散文件）：按用户输入处理——记录无license检出
+        时兜底Unknown，正文仍从用户指定的文件读出。"""
+        run_extract(sample_zip, tmp_path, "-p", "NOTICE")
+        text = readme_of(tmp_path)
+        assert "License: Unknown" in text
+        assert "This product includes software developed by the SampleLib Dev Team" in text
+
 
 @needs_scancode
 class TestInvalidInputs:
