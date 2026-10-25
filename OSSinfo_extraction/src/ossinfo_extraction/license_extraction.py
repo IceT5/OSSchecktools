@@ -192,7 +192,8 @@ def process_license_params(
         List[Dict]: 提取的license信息列表
     """
     # 获取扫描的根目录
-    scanned_root = data.get("headers", [{}])[0].get("options", {}).get("input", [None])[0]
+    scanned_root = (data.get("headers") or [{}])[0].get("options", {}).get("input") or [None]
+    scanned_root = scanned_root[0]
     if root_path is None:
         root_path = Path(scanned_root) if scanned_root else None
 
@@ -821,12 +822,12 @@ def _is_valid_license_path(file_path: str, target_license_files: Set[str]) -> bo
         return False
 
     # 路径深度检查：
-    # - 深度为1：不可能出现，因为扫描的是项目根目录下的文件
+    # - 深度为1：清理规则保证记录首段（扫描根目录名）不会被剥离，
+    #   该形态正常不会出现，保留为防御分支
     # - 深度为2：项目根目录下的文件（如 json-develop/LICENSE.MIT）
     # - 深度>=3：可能是 LICENSES 目录下的文件（如 json-develop/LICENSES/CC0-1.0.txt）
 
     if len(path_parts) == 1:
-        # 不应该出现这种情况，因为项目代码都在项目根目录下
         return False
     elif len(path_parts) == 2:
         # 项目根目录下的文件（如 json-develop/LICENSE.MIT）
@@ -882,7 +883,7 @@ def _get_license_path_priority(file_path: str) -> int:
     # 路径格式：项目名/license文件 或 项目名/LICENSES/license文件
 
     if len(path_parts) == 1:
-        # 只有一个部分（不太可能出现在我们的场景中）
+        # 与路径有效性检查一致：清理规则保证该形态正常不出现
         return 3
     elif len(path_parts) == 2:
         # 项目根目录下的文件（如 json-develop/LICENSE.MIT）
@@ -921,11 +922,17 @@ def _clean_scancode_path(file_path: str) -> str:
     if not path_parts:
         return file_path
 
-    # 查找并跳过 -extract 目录
+    # 查找并跳过 -extract 目录。剥离条件：-extract段之后仍存在
+    # “目录/文件”两级结构，说明它是extractcode的包装层；若其后仅剩
+    # 单个文件，说明该-extract目录就是项目根本身（扁平压缩包：包内
+    # 文件直接散落在解压根下），此时扫描记录首段即项目根名，保留
+    # 不剥（记录形如 xxx-extract/LICENSE，与规范包的 pkg-1.0/LICENSE
+    # 同构，深度2即项目根文件语义）。
     start_idx = 0
     for i, part in enumerate(path_parts):
         if "-extract" in part.lower():
-            start_idx = i + 1
+            if len(path_parts) - (i + 1) >= 2:
+                start_idx = i + 1
             break
 
     # 返回清理后的路径
