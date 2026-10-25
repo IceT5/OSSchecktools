@@ -32,11 +32,17 @@ if str(SRC) not in sys.path:
 from package_builder import (  # noqa: E402
     PKG_ROOT,
     british_entries,
+    chinese_entries,
     deep_nested_entries,
     empty_dir_entries,
     make_archive,
+    make_corrupt_zip,
+    make_empty_zip,
+    make_nested_archive,
+    mismatch_entries,
     no_license_entries,
     samplelib_entries,
+    spdx_only_entries,
     spdx_suffix_entries,
     write_tree,
 )
@@ -59,21 +65,31 @@ def _scancode_version() -> str:
     return ""
 
 
-needs_scancode = pytest.mark.skipif(
+# 存在性门控（无scancode时跳过）+命名标记（供版本门控按用例生效）
+scan_required = pytest.mark.scan_required
+needs_scancode = scan_required(pytest.mark.skipif(
     shutil.which("scancode") is None or shutil.which("extractcode") is None,
     reason="scancode/extractcode not on PATH",
-)
+))
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _gate_scancode_version(request):
-    """扫描类用例对scancode版本的检出行为有约定，版本不符时明确跳过。"""
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "scan_required: 用例依赖真实scancode扫描行为，受版本门控")
+
+
+def pytest_collection_modifyitems(config, items):
+    """版本门控只作用于标记为需要扫描环境的用例（needs_scancode），
+    不影响无需scancode的单元层与CLI层用例。"""
     if shutil.which("scancode") is None:
-        return
+        return  # 存在性由skipif处理
     version = _scancode_version()
     if version and not version.startswith(EXPECTED_SCANCODE_VERSION):
-        pytest.skip(f"scancode {version} != {EXPECTED_SCANCODE_VERSION}: "
-                    f"检出行为断言可能不适用")
+        skip_mark = pytest.mark.skip(
+            reason=f"scancode {version} != {EXPECTED_SCANCODE_VERSION}: 检出行为断言可能不适用")
+        for item in items:
+            if item.get_closest_marker("scan_required"):
+                item.add_marker(skip_mark)
 
 
 @pytest.fixture(autouse=True)
@@ -179,6 +195,42 @@ def bare_zip(pkg_dir) -> Path:
 def near_empty_zip(pkg_dir) -> Path:
     """仅含占位文件的包（近空目录边界形态）。"""
     return make_archive(empty_dir_entries(), pkg_dir / "emptylib.zip")
+
+
+@pytest.fixture(scope="session")
+def chinese_zip(pkg_dir) -> Path:
+    """中文目录/文件名的包。"""
+    return make_archive(chinese_entries(), pkg_dir / "项目库-1.0.zip")
+
+
+@pytest.fixture(scope="session")
+def mismatch_zip(pkg_dir) -> Path:
+    """文件名与内容不一致、CRLF/BOM/空文件变体的包。"""
+    return make_archive(mismatch_entries(), pkg_dir / "mismatch-1.0.zip")
+
+
+@pytest.fixture(scope="session")
+def spdx_only_zip(pkg_dir) -> Path:
+    """无license文件、仅源码内SPDX声明行的包。"""
+    return make_archive(spdx_only_entries(), pkg_dir / "spdxsrc-1.0.zip")
+
+
+@pytest.fixture(scope="session")
+def nested_archive(pkg_dir) -> Path:
+    """tar.gz内封装zip的嵌套压缩包。"""
+    return make_nested_archive(pkg_dir / "nested.tgz")
+
+
+@pytest.fixture(scope="session")
+def corrupt_zip(pkg_dir) -> Path:
+    """损坏zip。"""
+    return make_corrupt_zip(pkg_dir / "corrupt.zip")
+
+
+@pytest.fixture(scope="session")
+def empty_zip(pkg_dir) -> Path:
+    """空zip（0条目）。"""
+    return make_empty_zip(pkg_dir / "emptyarch.zip")
 
 
 def run_cli(work_dir: Path, *args: str, env_extra: dict | None = None):
