@@ -155,6 +155,13 @@ class TestNameSelect:
         records = process_license_params(scan_data(SHADOW), Path(SIM_ROOT), "apache", None)
         assert any(r["spdx_identifier"] == "Apache-2.0" for r in records)
 
+    def test_suffix_variant_matches_base_detection(self):
+        """-l带-only限定符而检出为基名（或反之）：互相包含即匹配。"""
+        files = [rec("pkg-1.0/COPYING", "GPL-3.0")]
+        records = process_license_params(scan_data(files), Path(SIM_ROOT),
+                                         "GPL-3.0-only", None)
+        assert any(r["spdx_identifier"] == "GPL-3.0" for r in records)
+
     def test_no_match_falls_back_to_user_name(self):
         got = one(process_license_params(scan_data(SHADOW), Path(SIM_ROOT), "Zlib", None))
         assert got["spdx_identifier"] == "Zlib"
@@ -235,15 +242,48 @@ class TestFullExtraction:
         assert {r["file"] for r in records} == {"v1.zip-extract/LICENSE",
                                                 "v1.zip-extract/COPYING.LESSER"}
 
-    def test_flat_root_and_subdir_different_spdx_both_kept(self):
-        """扁平包根与子目录license不同SPDX时各自保留（子目录记录剥包装层
-        后深度为2，按既有规则同样接受）。"""
+    def test_flat_root_and_subdir_different_spdx(self):
+        """扁平包：根文件接受；子目录文件（docs/LICENSE）与嵌套形态一致
+        地被拒——清理保留根名段后深度为3，非一级LICENSES目录。"""
         files = [rec("v1.zip-extract/docs/LICENSE", "BSD-3-Clause"),
                  rec("v1.zip-extract/LICENSE", "MIT")]
         root = Path("X:/sim/v1.zip-extract")
         records = process_license_params(scan_data(files, root=str(root)), root, None, None)
+        assert [r["file"] for r in records] == ["v1.zip-extract/LICENSE"]
+
+    def test_flat_licenses_dir_nonstandard_name_accepted(self):
+        """扁平包一级LICENSES目录内非规范命名license：与嵌套形态一致地
+        被接受（清理保留根名段后深度3走LICENSES分支）。"""
+        files = [rec("v1.zip-extract/LICENSES/custom.txt", "MIT"),
+                 rec("v1.zip-extract/LICENSE", "Apache-2.0")]
+        root = Path("X:/sim/v1.zip-extract")
+        records = process_license_params(scan_data(files, root=str(root)), root, None, None)
         assert {r["file"] for r in records} == {"v1.zip-extract/LICENSE",
-                                                "v1.zip-extract/docs/LICENSE"}
+                                                "v1.zip-extract/LICENSES/custom.txt"}
+
+    def test_infix_extract_directory_not_stripped(self):
+        """中段目录名含-extract子串（如feature-extraction，ML包常见）：
+        不是包装层，不剥离，深层文件照常按子目录规则拒绝。"""
+        files = [rec("pkg-1.0/feature-extraction/models/LICENSE", "MIT"),
+                 rec("pkg-1.0/LICENSE", "Apache-2.0")]
+        records = process_license_params(scan_data(files), Path(SIM_ROOT), None, None)
+        assert [r["file"] for r in records] == ["pkg-1.0/LICENSE"]
+
+    def test_project_root_named_with_extract(self):
+        """项目根本身名为xxx-extract（如research-extract.tar）：根文件与
+        子目录文件统一按根名锚定处理，不因目录名字符运气分裂。"""
+        root = Path("X:/sim/research-extract")
+        files = [rec("research-extract/LICENSE", "MIT"),
+                 rec("research-extract/docs/LICENSE", "BSD-3-Clause")]
+        records = process_license_params(scan_data(files, root=str(root)), root, None, None)
+        assert [r["file"] for r in records] == ["research-extract/LICENSE"]
+
+    def test_path_override_with_extract_infix_directory(self):
+        """-p显式指定含-extract子串的中段目录下文件：用户意志优先，仍选中。"""
+        files = [rec("pkg-1.0/research-extract/docs/LICENSE", "BSD-3-Clause")]
+        got = one(process_license_params(
+            scan_data(files), Path(SIM_ROOT), None, "research-extract/docs/LICENSE"))
+        assert got["file"] == "pkg-1.0/research-extract/docs/LICENSE"
 
     def test_flat_licenses_dir_accepted(self):
         files = [rec("v1.zip-extract/LICENSES/GPL-3.0-only.txt", "GPL-3.0-only"),

@@ -213,10 +213,12 @@ def process_license_params(
         filename = Path(f).name.lower()
         target_license_filenames.add(filename)
 
+    root_name = root_path.name if root_path else None
+
     if license_name and not license_path:
         # 只填license名称：提取对应的license文本路径
         return _select_license_name_records(
-            data, target_license_files, target_license_filenames, license_name
+            data, target_license_files, target_license_filenames, license_name, root_name
         )
 
     if license_path and not license_name:
@@ -234,7 +236,7 @@ def process_license_params(
     # 都不填：执行完整license提取
     info("Performing full license extraction")
     license_records = _extract_all_licenses(
-        data, target_license_files, target_license_filenames
+        data, target_license_files, target_license_filenames, root_name
     )
 
     # 提示用户人工核对
@@ -247,6 +249,7 @@ def _select_license_name_records(
     target_license_files: Set[str],
     target_license_filenames: Set[str],
     license_name: str,
+    root_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     只指定license名称时：提取与该名称对应的license记录。
@@ -263,7 +266,7 @@ def _select_license_name_records(
     info(f"Searching for license path matching name: {license_name}")
 
     matching_records = _find_license_by_name(
-        data, target_license_files, target_license_filenames, license_name
+        data, target_license_files, target_license_filenames, license_name, root_name
     )
 
     if matching_records:
@@ -626,7 +629,8 @@ def _build_license_record(file_info: dict, file_path: str,
     }
 
 
-def _filter_by_priority(groups: Dict[Any, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+def _filter_by_priority(groups: Dict[Any, List[Dict[str, Any]]],
+                        root_name: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     对分组的license记录按优先级去重，每组只保留优先级最高的记录。
 
@@ -648,7 +652,7 @@ def _filter_by_priority(groups: Dict[Any, List[Dict[str, Any]]]) -> List[Dict[st
         sorted_records = sorted(
             records,
             key=lambda r: (
-                _get_license_path_priority(r["file"]),
+                _get_license_path_priority(r["file"], root_name),
                 0 if r.get("from_file_self", True) else 1,
             )
         )
@@ -663,6 +667,7 @@ def _find_license_by_name(
     target_license_files: Set[str],
     target_license_filenames: Set[str],
     license_name: str,
+    root_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     根据license名称查找对应的license记录。
@@ -691,7 +696,7 @@ def _find_license_by_name(
         file_path = file_info.get("path", "")
 
         # 使用严格的路径检查
-        if not _is_valid_license_path(file_path, target_license_files):
+        if not _is_valid_license_path(file_path, target_license_files, root_name):
             continue
 
         detected_spdx = file_info.get("detected_license_expression_spdx", "")
@@ -717,7 +722,7 @@ def _find_license_by_name(
         spdx_groups: Dict[str, List[Dict[str, Any]]] = {}
         for record in matching_records:
             spdx_groups.setdefault(record["spdx_identifier"], []).append(record)
-        matching_records = _filter_by_priority(spdx_groups)
+        matching_records = _filter_by_priority(spdx_groups, root_name)
 
     return matching_records
 
@@ -757,7 +762,8 @@ def _find_license_by_path(
 
         # 扫描记录以扫描根目录名开头（如 json-3.11.3/LICENSE.MIT），
         # 剥离根名前缀后拼接还原为绝对路径再比较
-        candidate = Path(_clean_scancode_path(file_path))
+        candidate = Path(_clean_scancode_path(
+            file_path, root_path.name if root_path else None))
         if candidate.parts and candidate.parts[0].lower() == root_path.name.lower():
             candidate = Path(*candidate.parts[1:])
         if (root_path / candidate).resolve() != license_full_path:
@@ -783,7 +789,8 @@ def _find_license_by_path(
     return None
 
 
-def _is_valid_license_path(file_path: str, target_license_files: Set[str]) -> bool:
+def _is_valid_license_path(file_path: str, target_license_files: Set[str],
+                           root_name: Optional[str] = None) -> bool:
     """
     检查license文件路径是否有效。
 
@@ -810,7 +817,7 @@ def _is_valid_license_path(file_path: str, target_license_files: Set[str]) -> bo
         return True
 
     # 清理路径：移除解压根目录前缀（如 xxx-extract/project-name/ -> project-name/）
-    cleaned_path = _clean_scancode_path(file_path)
+    cleaned_path = _clean_scancode_path(file_path, root_name)
 
     # 解析清理后的路径
     path_parts = Path(cleaned_path).parts
@@ -847,7 +854,7 @@ def _is_valid_license_path(file_path: str, target_license_files: Set[str]) -> bo
             return False
 
 
-def _get_license_path_priority(file_path: str) -> int:
+def _get_license_path_priority(file_path: str, root_name: Optional[str] = None) -> int:
     """
     获取license文件路径的优先级。
 
@@ -868,7 +875,7 @@ def _get_license_path_priority(file_path: str) -> int:
         int: 优先级数字（越小优先级越高）
     """
     # 清理路径
-    cleaned_path = _clean_scancode_path(file_path)
+    cleaned_path = _clean_scancode_path(file_path, root_name)
 
     # 标准化路径分隔符
     path_parts = cleaned_path.replace("\\", "/").lower().split("/")
@@ -899,19 +906,29 @@ def _get_license_path_priority(file_path: str) -> int:
             return 3
 
 
-def _clean_scancode_path(file_path: str) -> str:
+def _clean_scancode_path(file_path: str, root_name: Optional[str] = None) -> str:
     """
-    清理scancode输出的路径，移除解压根目录前缀。
+    清理scancode输出的路径。
 
-    例如：
-    - json-develop.zip-extract/json-develop/LICENSE.MIT -> json-develop/LICENSE.MIT
-    - json-develop/LICENSE.MIT -> json-develop/LICENSE.MIT（不变）
+    扫描记录首段恒为扫描根目录名（scancode约定，即项目根名）。首段与
+    项目根名一致时记录不存在包装层，原样返回；不一致时为历史遗留的
+    两层前缀形态（解压根/项目根/文件），剥离-extract包装层。清理结果
+    统一保留项目根名前缀（首段=根名），既有深度语义不变：
+    深度2=根文件、深度3=根下LICENSES目录或子目录、更深=子目录内部。
+
+    例如（root_name="json-develop"）：
+    - json-develop/LICENSE.MIT -> json-develop/LICENSE.MIT（首段即根名，不剥）
+    - json-develop.zip-extract/json-develop/LICENSE.MIT -> json-develop/LICENSE.MIT（剥包装层）
+    - json-develop/feature-extraction/models/LICENSE -> 原样（首段即根名；
+      目录名含-extract子串不构成剥离依据）
 
     Args:
         file_path: 原始文件路径
+        root_name: 扫描根目录名（即项目根名），提供时用于锚定首段；
+            未提供时仅做-extract包装层剥离（兼容既有调用）
 
     Returns:
-        str: 清理后的路径
+        str: 清理后的路径（保留项目根名前缀）
     """
     # 标准化路径分隔符
     path_parts = file_path.replace("\\", "/").split("/")
@@ -922,17 +939,18 @@ def _clean_scancode_path(file_path: str) -> str:
     if not path_parts:
         return file_path
 
-    # 查找并跳过 -extract 目录。剥离条件：-extract段之后仍存在
-    # “目录/文件”两级结构，说明它是extractcode的包装层；若其后仅剩
-    # 单个文件，说明该-extract目录就是项目根本身（扁平压缩包：包内
-    # 文件直接散落在解压根下），此时扫描记录首段即项目根名，保留
-    # 不剥（记录形如 xxx-extract/LICENSE，与规范包的 pkg-1.0/LICENSE
-    # 同构，深度2即项目根文件语义）。
+    # 首段与项目根名一致：记录不存在包装层，原样保留。
+    # 不以"名字含-extract"猜测剥离——中段目录名（如feature-extraction/）
+    # 或项目根本身（如扁平压缩包的解压根xxx-extract）含该子串时，
+    # 误剥会破坏"清理后首段=项目根名"这一深度语义的前提。
+    if root_name and path_parts[0].lower() == root_name.lower():
+        return "/".join(path_parts)
+
+    # 首段不是项目根名：历史两层前缀形态，剥离-extract包装层
     start_idx = 0
     for i, part in enumerate(path_parts):
-        if "-extract" in part.lower():
-            if len(path_parts) - (i + 1) >= 2:
-                start_idx = i + 1
+        if part.lower().endswith("-extract"):
+            start_idx = i + 1
             break
 
     # 返回清理后的路径
@@ -943,6 +961,7 @@ def _extract_all_licenses(
     data: dict,
     target_license_files: Set[str],
     target_license_filenames: Set[str],
+    root_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     提取所有license信息。
@@ -971,7 +990,7 @@ def _extract_all_licenses(
         file_path = file_info.get("path", "")
 
         # 使用严格的路径检查
-        if not _is_valid_license_path(file_path, target_license_files):
+        if not _is_valid_license_path(file_path, target_license_files, root_name):
             continue
 
         detected_license = file_info.get("detected_license_expression", "")
@@ -1000,7 +1019,7 @@ def _extract_all_licenses(
         for record in license_records:
             key = (record["spdx_identifier"], record["license_expression"])
             spdx_license_groups.setdefault(key, []).append(record)
-        license_records = _filter_by_priority(spdx_license_groups)
+        license_records = _filter_by_priority(spdx_license_groups, root_name)
 
     info(f"Extracted {len(license_records)} unique license records")
     return license_records

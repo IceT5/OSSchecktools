@@ -102,15 +102,15 @@ class TestPackageShapes:
         """无顶层目录的包：解压根即项目根（扫描记录带-extract前缀）。
 
         曾因清理规则误剥项目根段（首段恰含-extract后缀）导致根文件
-        变为深度1被防御分支拒绝（真实bug，已修复：剥离增加结构判断，
-        -extract段后仅剩单文件时保留不剥）。此形态下子目录license
-        （docs/LICENSE）的包装段仍会剥离、深度为2按既有规则接受。
+        变为深度1被防御分支拒绝（真实bug，已修复：清理以扫描根名锚定
+        首段，首段即根名时不剥）。子目录license（docs/LICENSE）与嵌套
+        形态一致地被拒（深度3非一级LICENSES目录）。
         """
         run_extract(sample_zip_flat, tmp_path)
         text = readme_of(tmp_path)
         assert "License: MIT\n" in text and MIT_MARK in text
         assert "LGPL-2.1" in text and LGPL_MARK in text
-        assert "License: BSD-3-Clause" in text  # 子目录包装段剥离后深度2被接受
+        assert "License: BSD-3-Clause" not in text  # 与嵌套形态行为一致
 
     def test_deep_nested_archive(self, sample_zip_deep, tmp_path):
         """双层顶层目录：递归检测到真正的项目根。"""
@@ -147,6 +147,121 @@ class TestPackageShapes:
         """仅含占位文件的包：完整跑通不崩溃。"""
         run_extract(near_empty_zip, tmp_path)
         assert "No license information found" in readme_of(tmp_path)
+
+
+@needs_scancode
+class TestArchiveEdgeCases:
+    """压缩包形态与内容边界的真实扫描行为。"""
+
+    def test_chinese_filenames(self, chinese_zip, tmp_path):
+        """中文目录/文件名：嵌套检测深入中文目录，正常提取。
+        注：ScanCode将中文作者名转写为拼音（Zhong Wen Zuo Zhe）。"""
+        run_extract(chinese_zip, tmp_path)
+        text = readme_of(tmp_path)
+        assert "License: MIT\n" in text and MIT_MARK in text
+        assert "Copyright (c) 2024 Zhong Wen Zuo Zhe" in text
+
+    def test_content_overrides_filename(self, mismatch_zip, tmp_path):
+        """LICENSE文件名装Apache内容：提取以内容为准报Apache-2.0。"""
+        run_extract(mismatch_zip, tmp_path)
+        text = readme_of(tmp_path)
+        assert "License: Apache-2.0\n" in text and APACHE_MARK in text
+
+    def test_crlf_and_bom_license_files(self, mismatch_zip, tmp_path):
+        """CRLF行尾与UTF-8 BOM的license文件均可正常检出。"""
+        result = run_cli(tmp_path, "-t", str(mismatch_zip), "-n", "t", "-v", "1",
+                         "-p", "crlf.txt", "-o", str(tmp_path))
+        assert result.returncode == 0
+        assert "License: Apache-2.0" in readme_of(tmp_path)
+        result = run_cli(tmp_path, "-t", str(mismatch_zip), "-n", "t", "-v", "1",
+                         "-p", "bom.txt", "-o", str(tmp_path))
+        assert result.returncode == 0
+        assert "License: Apache-2.0" in readme_of(tmp_path)
+
+    def test_empty_license_file_falls_back(self, mismatch_zip, tmp_path):
+        """-p指向0字节文件：兜底Unknown且不崩溃。"""
+        result = run_cli(tmp_path, "-t", str(mismatch_zip), "-n", "t", "-v", "1",
+                         "-p", "empty.txt", "-o", str(tmp_path))
+        assert result.returncode == 0
+        assert "License: Unknown" in readme_of(tmp_path)
+
+    def test_spdx_only_source_declarations(self, spdx_only_zip, tmp_path):
+        """无license文件、仅源码内SPDX声明：不进自动提取（工具以license
+        文件为提取对象，固化现状边界）。"""
+        run_extract(spdx_only_zip, tmp_path)
+        assert "No license information found" in readme_of(tmp_path)
+
+    def test_nested_archive_inner_not_extracted(self, nested_archive, tmp_path):
+        """tar.gz内封装zip：extractcode以--shallow运行，不解内层压缩包，
+        scancode不透视zip二进制，内层license不提取（固化现状边界）。"""
+        run_extract(nested_archive, tmp_path)
+        assert "No license information found" in readme_of(tmp_path)
+
+    def test_corrupt_zip_fails_cleanly(self, corrupt_zip, tmp_path):
+        """损坏zip：extractcode不产出解压目录，extract.py存在性检查抛错，
+        流水线以明确报错失败退出（非崩溃、非静默成功）。"""
+        result = run_cli(tmp_path, "-t", str(corrupt_zip), "-n", "t", "-v", "1",
+                         "-o", str(tmp_path))
+        assert result.returncode == 1
+        assert "Pipeline failed" in result.stdout
+        assert "Expected extract directory not found" in result.stdout
+
+    def test_empty_zip_does_not_crash(self, empty_zip, tmp_path):
+        """空zip（0条目）：同上。"""
+        run_extract(empty_zip, tmp_path)
+        assert "No license information found" in readme_of(tmp_path)
+
+
+@needs_scancode
+class TestUserInputBoundaries:
+    """用户输入的容错形态（均已实证当前行为）。"""
+
+    def test_trailing_slash_on_file(self, sample_zip, tmp_path):
+        """-p指向文件但带尾部斜杠：正常命中。"""
+        run_extract(sample_zip, tmp_path, "-p", "LICENSE/")
+        assert "License: MIT\n" in readme_of(tmp_path)
+
+    def test_double_leading_slash(self, sample_zip, tmp_path):
+        """-p带多余前导斜杠：正常命中。"""
+        run_extract(sample_zip, tmp_path, "-p", "//LICENSE")
+        assert "License: MIT\n" in readme_of(tmp_path)
+
+    def test_double_inner_slash(self, sample_zip, tmp_path):
+        """-p路径内含连续斜杠：正常命中。"""
+        run_extract(sample_zip, tmp_path, "-p", "LICENSES//Apache-2.0.txt")
+        assert "License: Apache-2.0\n" in readme_of(tmp_path)
+
+    def test_license_name_only(self, sample_zip, tmp_path):
+        """-l单独使用：按名称选中根license记录。"""
+        result = run_cli(tmp_path, "-t", str(sample_zip), "-n", "t", "-v", "1",
+                         "-l", "MIT", "-o", str(tmp_path))
+        assert result.returncode == 0
+        assert "License: MIT\n" in readme_of(tmp_path)
+
+    def test_empty_license_name_degrades_to_full(self, sample_zip, tmp_path):
+        """-l空串：与未提供等价，降级为全量提取。"""
+        result = run_cli(tmp_path, "-t", str(sample_zip), "-n", "t", "-v", "1",
+                         "-l", "", "-o", str(tmp_path))
+        assert result.returncode == 0
+        assert "License: MIT\n" in readme_of(tmp_path)
+
+    def test_idempotent_rerun(self, sample_zip, tmp_path):
+        """同一输出目录重复运行：结果一致（幂等）。"""
+        first = run_extract(sample_zip, tmp_path)
+        text_first = readme_of(tmp_path)
+        second = run_extract(sample_zip, tmp_path)
+        assert second.returncode == first.returncode == 0
+        assert readme_of(tmp_path) == text_first
+
+    def test_relative_target_path(self, sample_zip, tmp_path):
+        """-t相对路径（基于工作目录解析）。"""
+        import shutil
+        local = tmp_path / "rel-sample.zip"
+        shutil.copy(sample_zip, local)
+        result = run_cli(tmp_path, "-t", "rel-sample.zip", "-n", "t", "-v", "1",
+                         "-o", str(tmp_path))
+        assert result.returncode == 0
+        assert "License: MIT\n" in readme_of(tmp_path)
 
 
 @needs_scancode

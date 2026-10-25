@@ -17,15 +17,16 @@
 运行方式（仓库根目录执行）：
 
 ```bash
-python -m pytest OSSinfo_extraction/tests -q                     # 全量（约7分钟）
-python -m pytest OSSinfo_extraction/tests -q --ignore=OSSinfo_extraction/tests/test_e2e_real_package.py   # 仅单元层（约3秒）
+python -m pytest OSSinfo_extraction/tests -q                     # 全量（十余分钟，扫描用例为主）
+python -m pytest OSSinfo_extraction/tests -q --ignore=OSSinfo_extraction/tests/test_e2e_real_package.py   # 仅单元层（秒级）
 python -m pytest OSSinfo_extraction/tests/test_e2e_real_package.py -q   # 仅端到端
 ```
 
 环境要求与自动跳过：
 
 - 端到端用例依赖PATH上的`scancode`与`extractcode`，缺失时自动跳过
-- 端到端断言编码了ScanCode **32.5.0**的检出行为（版本门控），其他版本自动跳过
+- 端到端断言编码了ScanCode **32.5.0**的检出行为：PATH上存在其他版本时，
+  **仅扫描类用例**自动跳过（单元层与无需扫描的CLI用例不受影响）
 - symlink相关用例在无创建权限的平台（未开启开发者模式的Windows）自动跳过
 - 子进程固定`PYTHONUTF8`与`LOG_LEVEL=INFO`，不受运行环境影响
 
@@ -65,6 +66,16 @@ samplelib-1.2.3/
 ### 输入形态
 - 目录输入、扁平压缩包（无顶层目录）、标准sdist嵌套、双层wrapper嵌套
 - 六种压缩格式、近空包（仅占位文件）、不存在的target、非压缩包普通文件
+- 嵌套压缩包（tar.gz内封装zip）：流水线以`--shallow`解压，内层压缩包
+  不被递归解开，scancode不透视zip二进制，内层license不提取（固化边界）
+- 损坏zip（extractcode不产出解压目录，流水线以"Expected extract
+  directory not found"明确失败退出）
+- 空zip（0条目，完整走通输出占位文案）
+- 中文目录/文件名包（嵌套检测深入中文目录，正常提取中文版权声明）
+- 文件名与内容不一致（LICENSE文件名装Apache全文，提取以内容为准）
+- CRLF行尾、UTF-8 BOM的license文件正常检出；0字节license文件兜底
+- 无license文件、仅源码内SPDX声明行的包：不进自动提取（工具以
+  license文件为提取对象，固化现状边界）
 
 ### license文件名判定
 - 标准命名与大小写、COPYING/COPYRIGHT系列、MIT/Apache等SPDX风格命名
@@ -89,12 +100,26 @@ samplelib-1.2.3/
 - 拒绝类（exit 1）：不存在、目录、../上跳（含docs/../../混合）、外部绝对路径、
   目标内symlink指向外部（resolve展开后越界）
 - 接受类：..绕回目标内（docs/../LICENSE）、目标内symlink指向目标内文件
-- -extract包装前缀还原；扁平压缩包根文件的深度1放行
+- -extract包装前缀还原：仅历史两层前缀形态（首段非扫描根名）剥离包装层；
+  首段与扫描根名一致（含扁平压缩包的解压根名）时不剥，深度语义统一为
+  首段=项目根名
+- 用户意志优先（不受自动识别规则约束）：文件名不符合license模式（NOTICE）、
+  二级LICENSES目录、任意命名但含检出的文件，显式-p一律选中；对照断言
+  未指定-p时上述位置不进入自动提取
+- 输入容错：尾部斜杠（LICENSE/）、多余前导斜杠（//LICENSE）、
+  路径内连续斜杠（LICENSES//x.txt）均正常命中
 
 ### -l参数与组合
 - 精确/部分/大小写不敏感匹配；无匹配时以用户名称兜底
+- 限定符变体互包含：-l GPL-3.0-only与检出GPL-3.0（或反之）
+- -l空串与未提供等价，降级为全量提取
+- -l单独使用的端到端选中
 - -l+-p一致性校验：匹配输出检出记录；不匹配时保留用户名+实际检出文本
 - 路径无有效检出时回退Unknown记录（后续从磁盘读全文）
+
+### 输出与其他
+- 同一输出目录重复运行幂等（结果逐字节一致）
+- -t相对路径（基于工作目录解析）
 
 ### 版权声明提取
 - 四种书写形式全保留：Copyright (c)/(c)/copr./Copyright (C)
