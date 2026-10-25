@@ -299,6 +299,45 @@ class TestNameDedup:
         assert records[0]["file"] == "pkg-1.0/LICENSE.MIT"
 
 
+class TestUserOverride:
+    """-p的用户意志优先：显式指定的文件不受自动识别规则（文件名模式、
+    根目录/LICENSES目录位置限制）约束，一律按用户输入处理。"""
+
+    def test_filename_outside_license_patterns(self):
+        """文件名不符合license命名模式（如NOTICE）时，显式-p仍选中该记录。"""
+        files = [rec("pkg-1.0/third_party/NOTICE", "BSD-3-Clause"),
+                 rec("pkg-1.0/LICENSE", "Apache-2.0")]
+        got = one(process_license_params(
+            scan_data(files), Path(SIM_ROOT), None, "third_party/NOTICE"))
+        assert got["file"] == "pkg-1.0/third_party/NOTICE"
+        assert got["spdx_identifier"] == "BSD-3-Clause"
+
+    def test_non_top_level_licenses_dir(self):
+        """二级LICENSES目录（自动识别仅认一级）中的文件，显式-p仍选中。"""
+        files = [rec("pkg-1.0/vendor/lib/LICENSES/custom.txt", "MIT"),
+                 rec("pkg-1.0/LICENSE", "Apache-2.0")]
+        got = one(process_license_params(
+            scan_data(files), Path(SIM_ROOT), None, "vendor/lib/LICENSES/custom.txt"))
+        assert got["file"] == "pkg-1.0/vendor/lib/LICENSES/custom.txt"
+
+    def test_arbitrary_name_with_detection(self):
+        """任意命名的文件（README含完整license文本的变体场景），显式-p选中。"""
+        files = [rec("pkg-1.0/docs/README", "GPL-3.0-only"),
+                 rec("pkg-1.0/LICENSE", "Apache-2.0")]
+        got = one(process_license_params(
+            scan_data(files), Path(SIM_ROOT), None, "docs/README"))
+        assert got["file"] == "pkg-1.0/docs/README"
+        assert got["spdx_identifier"] == "GPL-3.0-only"
+
+    def test_override_does_not_leak_into_auto_extraction(self):
+        """对照：不指定-p时，上述非规范位置的记录不进入自动提取。"""
+        files = [rec("pkg-1.0/third_party/NOTICE", "BSD-3-Clause"),
+                 rec("pkg-1.0/vendor/lib/LICENSES/custom.txt", "MIT"),
+                 rec("pkg-1.0/LICENSE", "Apache-2.0")]
+        records = process_license_params(scan_data(files), Path(SIM_ROOT), None, None)
+        assert [r["file"] for r in records] == ["pkg-1.0/LICENSE"]
+
+
 class TestMalformedRecords:
     """异常扫描数据的容错。"""
 
