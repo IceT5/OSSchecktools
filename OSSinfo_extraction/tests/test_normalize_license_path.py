@@ -74,9 +74,11 @@ def test_external_absolute_rejected(target):
         _normalize_license_path(target, str(target.parent / "elsewhere.txt"))
 
 
-def test_symlink_escape_rejected(target, tmp_path):
+def test_symlink_escape_rejected(target, tmp_path_factory):
     """链接位于目标内但指向外部文件：resolve展开后越界，拒绝。"""
-    outside = tmp_path / "outside_secret.txt"
+    # target fixture 即 tmp_path，外部文件必须放在 target 之外，
+    # 否则 resolve 后仍在目标内，无法验证越界拒绝。
+    outside = tmp_path_factory.mktemp("outside") / "outside_secret.txt"
     outside.write_text("external\n", encoding="utf-8")
     link = target / "sneaky"
     try:
