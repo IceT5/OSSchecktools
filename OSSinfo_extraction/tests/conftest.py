@@ -156,12 +156,6 @@ def sample_tar(pkg_dir) -> Path:
 
 
 @pytest.fixture(scope="session")
-def sample_zip_flat(pkg_dir) -> Path:
-    """无顶层目录的zip（解压后文件直接散开）。"""
-    return make_archive(samplelib_entries(top=""), pkg_dir / "samplelib-flat.zip")
-
-
-@pytest.fixture(scope="session")
 def sample_zip_deep(pkg_dir) -> Path:
     """双层顶层目录的zip（wrapper再套项目目录）。"""
     return make_archive(deep_nested_entries(), pkg_dir / "samplelib-deep.zip")
