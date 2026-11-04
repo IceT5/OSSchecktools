@@ -32,7 +32,31 @@ Readme.opensource 文件生成模块
 from pathlib import Path
 from typing import List, Dict, Any
 
+import chardet
+
 from .logger import info, debug
+
+
+def _decode_license_text(raw: bytes) -> str:
+    """
+    自动识别license文件编码并解码。
+
+    使用chardet识别编码（覆盖UTF-8/UTF-16、GBK/GB18030、Big5、西欧编码
+    等）；识别失败或解码失败时退回UTF-8替换模式，保证流程不中断。
+    解码后统一换行为LF，保持原文本模式读取的既有输出行为。
+
+    Args:
+        raw: license文件原始字节
+
+    Returns:
+        str: 解码并统一换行后的文本
+    """
+    encoding = chardet.detect(raw).get("encoding") or "utf-8"
+    try:
+        text = raw.decode(encoding)
+    except (LookupError, UnicodeDecodeError):
+        text = raw.decode("utf-8", errors="replace")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _read_license_text(full_license_path: Path):
@@ -46,8 +70,7 @@ def _read_license_text(full_license_path: Path):
         str或None: 文件全文；读取失败时返回None
     """
     try:
-        with full_license_path.open("r", encoding="utf-8", errors="replace") as lf:
-            return lf.read()
+        return _decode_license_text(full_license_path.read_bytes())
     except Exception as e:
         debug(f"Failed to read license file {full_license_path}: {e}")
         return None

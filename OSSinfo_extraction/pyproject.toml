@@ -16,6 +16,7 @@ authors = [
 
 dependencies = [
     "scancode-toolkit==32.5.0",
+    "chardet>=3.0.0",
 ]
 
 [project.urls]
