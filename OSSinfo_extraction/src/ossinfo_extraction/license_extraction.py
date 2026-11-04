@@ -192,7 +192,8 @@ def process_license_params(
         List[Dict]: 提取的license信息列表
     """
     # 获取扫描的根目录
-    scanned_root = data.get("headers", [{}])[0].get("options", {}).get("input", [None])[0]
+    scanned_root = (data.get("headers") or [{}])[0].get("options", {}).get("input") or [None]
+    scanned_root = scanned_root[0]
     if root_path is None:
         root_path = Path(scanned_root) if scanned_root else None
 
