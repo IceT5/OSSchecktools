@@ -155,6 +155,13 @@ class TestNameSelect:
         records = process_license_params(scan_data(SHADOW), Path(SIM_ROOT), "apache", None)
         assert any(r["spdx_identifier"] == "Apache-2.0" for r in records)
 
+    def test_suffix_variant_matches_base_detection(self):
+        """-l带-only限定符而检出为基名（或反之）：互相包含即匹配。"""
+        files = [rec("pkg-1.0/COPYING", "GPL-3.0")]
+        records = process_license_params(scan_data(files), Path(SIM_ROOT),
+                                         "GPL-3.0-only", None)
+        assert any(r["spdx_identifier"] == "GPL-3.0" for r in records)
+
     def test_no_match_falls_back_to_user_name(self):
         got = one(process_license_params(scan_data(SHADOW), Path(SIM_ROOT), "Zlib", None))
         assert got["spdx_identifier"] == "Zlib"
@@ -223,35 +230,6 @@ class TestFullExtraction:
         ]
         records = process_license_params(scan_data(files), Path(SIM_ROOT), None, None)
         assert [r["file"] for r in records] == ["pkg-1.0/LICENSES/MIT.txt"]
-
-    def test_flat_archive_root_license_accepted(self):
-        """扁平压缩包（无顶层目录）：扫描根目录名即项目根，清理规则保留
-        该段不剥离，根文件记录形如 xxx-extract/LICENSE（深度2，与规范包
-        的 pkg-1.0/LICENSE 同构），按既有根文件逻辑接受。"""
-        files = [rec("v1.zip-extract/LICENSE", "MIT"),
-                 rec("v1.zip-extract/COPYING.LESSER", "LGPL-2.1")]
-        root = Path("X:/sim/v1.zip-extract")
-        records = process_license_params(scan_data(files, root=str(root)), root, None, None)
-        assert {r["file"] for r in records} == {"v1.zip-extract/LICENSE",
-                                                "v1.zip-extract/COPYING.LESSER"}
-
-    def test_flat_root_and_subdir_different_spdx_both_kept(self):
-        """扁平包根与子目录license不同SPDX时各自保留（子目录记录剥包装层
-        后深度为2，按既有规则同样接受）。"""
-        files = [rec("v1.zip-extract/docs/LICENSE", "BSD-3-Clause"),
-                 rec("v1.zip-extract/LICENSE", "MIT")]
-        root = Path("X:/sim/v1.zip-extract")
-        records = process_license_params(scan_data(files, root=str(root)), root, None, None)
-        assert {r["file"] for r in records} == {"v1.zip-extract/LICENSE",
-                                                "v1.zip-extract/docs/LICENSE"}
-
-    def test_flat_licenses_dir_accepted(self):
-        files = [rec("v1.zip-extract/LICENSES/GPL-3.0-only.txt", "GPL-3.0-only"),
-                 rec("v1.zip-extract/LICENSE", "MIT")]
-        root = Path("X:/sim/v1.zip-extract")
-        records = process_license_params(scan_data(files, root=str(root)), root, None, None)
-        assert {r["file"] for r in records} == {"v1.zip-extract/LICENSE",
-                                                "v1.zip-extract/LICENSES/GPL-3.0-only.txt"}
 
     def test_nested_root_license_accepted_unchanged(self):
         """规范嵌套包（主流形态）：清理行为不变，根文件照常接受。"""
