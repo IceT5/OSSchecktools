@@ -101,13 +101,26 @@ def test_multiple_licenses_layout(project, tmp_path):
 
 
 def test_latin1_file_does_not_crash(project, tmp_path):
-    """非UTF-8编码的license文件按errors=replace容错读入。"""
+    """非UTF-8编码的license文件按检测到的编码读取，可读部分保留。"""
     out = tmp_path / "Readme.opensource"
     records = [{"file": "samplelib-1.2.3/latin.txt", "spdx_identifier": "Unknown",
                 "license_expression": "Unknown", "matched_text": ""}]
     write_readme_opensource(out, "samplelib", "1.2.3", [], records, project)
     text = read(out)
     assert "lastique" in text  # 可读部分保留
+
+
+def test_gbk_license_file_decoded_without_mojibake(project, tmp_path):
+    """GBK编码的中文license全文应按检测到的编码正确解码，不出现U+FFFD。"""
+    gbk_text = "木兰宽松许可证，第2版\n\n版权所有，保留所有权利。\n"
+    (project / "LICENSE").write_bytes(gbk_text.encode("gbk"))
+    out = tmp_path / "Readme.opensource"
+    records = [{"file": "samplelib-1.2.3/LICENSE", "spdx_identifier": "MulanPSL-2.0",
+                "license_expression": "MulanPSL-2.0", "matched_text": ""}]
+    write_readme_opensource(out, "samplelib", "1.2.3", [], records, project)
+    text = read(out)
+    assert gbk_text.strip() in text
+    assert "�" not in text
 
 
 def test_license_text_without_trailing_newline_normalized(project, tmp_path):
