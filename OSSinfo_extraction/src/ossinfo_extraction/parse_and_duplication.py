@@ -12,10 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 from pathlib import Path
 
 from .logger import info
 from .config import COPYRIGHT_IGNORED_SUFFIXES
+
+_COPYRIGHT_MARKER = re.compile(r"(?i)\(c\)|©|copr\.")
+_MEANINGFUL_TOKEN = re.compile(r"[A-Za-z]{2,}|[一-鿿]{2,}")
+
+
+def _is_meaningful_copyright(value: str) -> bool:
+    """
+    判断ScanCode检出的copyright是否像有效声明。
+
+    ScanCode的copyright检测基于文本行解析，不区分代码、注释和字符串，
+    可能把C宏中的 ``(c) == L`` 误识别为 ``(c) (c) L``。含copyright单词的
+    声明直接保留；否则去掉(c)/©/copr.标记后，要求至少2个字母或2个中文字符，
+    过滤掉只有单字母或纯数字的明显噪声。
+    """
+    if re.search(r"(?i)copyright", value):
+        return True
+    remainder = _COPYRIGHT_MARKER.sub(" ", value)
+    return bool(_MEANINGFUL_TOKEN.search(remainder))
+
 
 def extract_and_duplicate_copyright(
     data: dict,
@@ -53,6 +73,9 @@ def extract_and_duplicate_copyright(
             value_stripped = value.strip()
 
             if not value_stripped:
+                continue
+
+            if not _is_meaningful_copyright(value_stripped):
                 continue
 
             if value_stripped not in unique_records:

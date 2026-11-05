@@ -14,12 +14,17 @@
 
 """copyright提取（extract_and_duplicate_copyright）的单元测试。
 
-核心行为：保留ScanCode检出的全部非空版权声明（不按"copyright"关键字
-二次过滤），含(c)/copr./Copyright (C)等真实书写形式；去重且保持首次
-出现顺序；文档类后缀跳过。
+核心行为：保留ScanCode检出的有效版权声明（不按"copyright"关键字二次过滤），
+含(c)/copr./Copyright (C)等真实书写形式；过滤仅有单字母/纯数字的明显误报
+（如C宏中被误识别的 ``(c) (c) L``）；去重且保持首次出现顺序；文档类后缀跳过。
 """
 
-from ossinfo_extraction.parse_and_duplication import extract_and_duplicate_copyright
+import pytest
+
+from ossinfo_extraction.parse_and_duplication import (
+    _is_meaningful_copyright,
+    extract_and_duplicate_copyright,
+)
 
 
 def fcopy(path, *statements):
@@ -94,3 +99,75 @@ def test_copyright_field_wins_over_statement(tmp_path):
 def test_whitespace_stripped(tmp_path):
     data = {"files": [fcopy("a.c", "   (c) 2020 Foo   ")]}
     assert extract_and_duplicate_copyright(data, tmp_path / "o.txt") == ["(c) 2020 Foo"]
+
+
+def test_macro_false_positive_dropped(tmp_path):
+    """ScanCode把C宏中的(c)==L误识别为(c) (c) L，应被过滤。"""
+    data = {"files": [fcopy(
+        "src/secinput.h",
+        "Copyright (c) Huawei Technologies Co., Ltd. 2014-2020",
+        "(c) (c) L",
+    )]}
+    records = extract_and_duplicate_copyright(data, tmp_path / "o.txt")
+    assert records == ["Copyright (c) Huawei Technologies Co., Ltd. 2014-2020"]
+
+
+def test_valid_non_keyword_forms_kept(tmp_path):
+    """不含copyright单词但holder有效的中文/英文/(c)/copr.声明保留。"""
+    data = {"files": [fcopy(
+        "a.c",
+        "(c) 1999 Entrust.net Limited",
+        "(c) Casper da Costa-Luis casperdcl (https://github.com/casperdcl)",
+        "copr. 2019 Vendor GmbH",
+        "版权所有",
+        "(c) 2020 华为",
+    )]}
+    records = extract_and_duplicate_copyright(data, tmp_path / "o.txt")
+    assert records == [
+        "(c) 1999 Entrust.net Limited",
+        "(c) Casper da Costa-Luis casperdcl (https://github.com/casperdcl)",
+        "copr. 2019 Vendor GmbH",
+        "版权所有",
+        "(c) 2020 华为",
+    ]
+
+
+def test_meaningless_fragments_dropped(tmp_path):
+    data = {"files": [fcopy("a.c", "(c) 2020", "(c) A", "(c) (c) L")]}
+    assert extract_and_duplicate_copyright(data, tmp_path / "o.txt") == []
+
+
+def test_copyright_keyword_kept_even_with_short_holder(tmp_path):
+    data = {"files": [fcopy("a.c", "Copyright (c) A")]}
+    assert extract_and_duplicate_copyright(data, tmp_path / "o.txt") == ["Copyright (c) A"]
+
+
+def test_statement_field_noise_dropped(tmp_path):
+    data = {"files": [{"path": "a.c", "copyrights": [{"statement": "(c) (c) L"}]}]}
+    assert extract_and_duplicate_copyright(data, tmp_path / "o.txt") == []
+
+
+def test_noise_filtered_before_dedup(tmp_path):
+    data = {"files": [
+        fcopy("a.c", "(c) (c) L", "(c) 2020 Foo"),
+        fcopy("b.c", "(c) 2020 Foo"),
+    ]}
+    assert extract_and_duplicate_copyright(data, tmp_path / "o.txt") == ["(c) 2020 Foo"]
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("(c) (c) L", False),
+    ("(c) 2020", False),
+    ("(c) A", False),
+    ("", False),
+    ("(c) 1999 Entrust.net Limited", True),
+    ("(c) Casper da Costa-Luis", True),
+    ("copr. 2019 Vendor GmbH", True),
+    ("版权所有", True),
+    ("(c) 2020 华为", True),
+    ("Copyright (c) A", True),
+    ("© 2020 Bar Corp", True),
+    ("(c) HP", True),
+])
+def test_is_meaningful_copyright(value, expected):
+    assert _is_meaningful_copyright(value) is expected
