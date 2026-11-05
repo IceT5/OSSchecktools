@@ -297,7 +297,7 @@ class TestInvalidInputs:
         result = run_cli(tmp_path, "-t", str(sample_zip), "-n", "s", "-v", "1",
                          "-p", "LICENSES", "-o", str(tmp_path))
         assert result.returncode == 1
-        assert "License file not found" in result.stdout
+        assert "License path is not a file" in result.stdout
 
     def test_license_path_escape_rejected(self, sample_zip, tmp_path):
         result = run_cli(tmp_path, "-t", str(sample_zip), "-n", "s", "-v", "1",

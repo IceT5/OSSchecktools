@@ -390,8 +390,10 @@ def _normalize_license_path(scan_target, license_path):
             license_full_path.relative_to(scan_target.resolve())
         except ValueError:
             error_exit(f"License file must be inside the target: {license_path}")
-        if not license_full_path.is_file():
+        if not license_full_path.exists():
             error_exit(f"License file not found: {license_path}")
+        if not license_full_path.is_file():
+            error_exit(f"License path is not a file: {license_path}")
 
         # 相对路径用于日志提示，绝对路径用于后续精确匹配，避免重复进行路径清理
         return normalized_license_path, license_full_path

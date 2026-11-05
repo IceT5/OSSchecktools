@@ -107,14 +107,16 @@ def test_dotdot_reentering_target_accepted(target):
     assert full == (target / "LICENSE").resolve()
 
 
-def test_directory_rejected(target):
+def test_directory_rejected(target, capsys):
     with pytest.raises(SystemExit):
         _normalize_license_path(target, "LICENSES")
+    assert "License path is not a file" in capsys.readouterr().out
 
 
-def test_missing_file_rejected(target):
+def test_missing_file_rejected(target, capsys):
     with pytest.raises(SystemExit):
         _normalize_license_path(target, "NOT-EXIST")
+    assert "License file not found" in capsys.readouterr().out
 
 
 def test_none_passthrough(target):
