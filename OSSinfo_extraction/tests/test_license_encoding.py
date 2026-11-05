@@ -169,3 +169,37 @@ def test_read_license_text_decodes_utf16_file(tmp_path):
     text = "木兰许可证\n"
     license_file.write_bytes(codecs.BOM_UTF16_LE + text.encode("utf-16-le"))
     assert _read_license_text(license_file) == text
+
+
+def test_utf8_with_accented_char_not_misdetected():
+    """UTF-8文本含少量重音字符时不能被chardet误判为Latin-1。"""
+    text = "Apache License\nVersion 2.0\n" * 50 + "Copyright (c) 2020 José\n"
+    decoded = _decode_license_text(text.encode("utf-8"))
+    assert "José" in decoded
+    assert "JosÃ©" not in decoded
+
+
+def test_valid_utf8_skips_chardet(monkeypatch):
+    """合法UTF-8直接解码，不依赖chardet的探测结果。"""
+    def fail_detect(raw):
+        raise AssertionError("valid UTF-8 should not call chardet")
+
+    monkeypatch.setattr(readme_opensource.chardet, "detect", fail_detect)
+    text = "Copyright (c) 2020 José"
+    assert _decode_license_text(text.encode("utf-8")) == text
+
+
+def test_gb18030_fallback_when_chardet_reports_gb2312(monkeypatch):
+    """chardet报GB2312但内容含GB18030扩展字时，改用gb18030解码。"""
+    monkeypatch.setattr(readme_opensource.chardet, "detect", lambda raw: {"encoding": "GB2312"})
+    text = "木兰许可证\n" * 10 + "扩展字符𠀀\n"
+    assert _decode_license_text(text.encode("gb18030")) == text
+
+
+def test_replace_fallback_uses_detected_encoding(monkeypatch):
+    """严格解码失败时按识别到的编码替换解码，避免整份文件变成U+FFFD。"""
+    monkeypatch.setattr(readme_opensource.chardet, "detect", lambda raw: {"encoding": "gb18030"})
+    raw = ("版权所有，保留所有权利。\n" * 100).encode("gbk") + b"\xff"
+    decoded = _decode_license_text(raw)
+    assert "版权所有" in decoded
+    assert decoded.count("�") == 1

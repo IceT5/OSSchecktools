@@ -41,9 +41,13 @@ def _decode_license_text(raw: bytes) -> str:
     """
     自动识别license文件编码并解码。
 
-    使用chardet识别编码（覆盖UTF-8/UTF-16、GBK/GB18030、Big5、西欧编码
-    等）；识别失败或解码失败时退回UTF-8替换模式，保证流程不中断。
-    解码后统一换行为LF，保持原文本模式读取的既有输出行为。
+    优先按UTF-8（含BOM）严格解码，避免chardet把以ASCII为主、仅含少量
+    非ASCII字符的UTF-8文本误判为Latin-1/Windows-1252。UTF-8快路径未成功
+    （解码失败或内容含NUL）时交给chardet识别；GB2312/GBK结果再尝试其超集
+    GB18030。全部严格解码失败时，用最后识别到的编码做替换解码，尽量保留
+    可读内容，最后退回UTF-8替换模式。解码后统一换行为LF。
+
+    已知限制：无BOM的UTF-16、极短的GBK扩展字文本可能被chardet误判。
 
     Args:
         raw: license文件原始字节
@@ -51,11 +55,34 @@ def _decode_license_text(raw: bytes) -> str:
     Returns:
         str: 解码并统一换行后的文本
     """
-    encoding = chardet.detect(raw).get("encoding") or "utf-8"
-    try:
-        text = raw.decode(encoding)
-    except (LookupError, UnicodeDecodeError):
-        text = raw.decode("utf-8", errors="replace")
+    text = None
+    # 无BOM的UTF-16字节常含NUL，此时跳过UTF-8快路径
+    if b"\x00" not in raw:
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            pass
+
+    if text is None:
+        detected = chardet.detect(raw).get("encoding") or "utf-8"
+        candidates = [detected]
+        if detected.lower() in ("gb2312", "gbk"):
+            candidates.append("gb18030")
+
+        # 记录最后一个可用的编码，严格解码失败时用它做替换解码，
+        # 避免整份非UTF-8文件被当作UTF-8而全部变成替换符
+        last_valid = "utf-8"
+        for encoding in candidates:
+            try:
+                text = raw.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                last_valid = encoding
+            except LookupError:
+                continue
+        else:
+            text = raw.decode(last_valid, errors="replace")
+
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
