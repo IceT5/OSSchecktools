@@ -15,7 +15,8 @@
 """copyright提取（extract_and_duplicate_copyright）的单元测试。
 
 核心行为：保留ScanCode检出的有效版权声明（不按"copyright"关键字二次过滤），
-含(c)/copr./Copyright (C)等真实书写形式；过滤仅有单字母/纯数字的明显误报
+含(c)/copr./Copyright (C)等真实书写形式，以及拉丁、中日韩、西里尔、希腊、
+阿拉伯、泰、印地等文字的holder；过滤仅有单字母/纯数字的明显误报
 （如C宏中被误识别的 ``(c) (c) L``）；去重且保持首次出现顺序；文档类后缀跳过。
 """
 
@@ -155,11 +156,34 @@ def test_noise_filtered_before_dedup(tmp_path):
     assert extract_and_duplicate_copyright(data, tmp_path / "o.txt") == ["(c) 2020 Foo"]
 
 
+# ScanCode 32.5.0在版权检测前会做toascii(translit=True)转写，实际扫描结果
+# 多为ASCII（如"华为"->"Hua Wei"）；以下用例直接测试过滤器的Unicode防御能力，
+# 避免上游改变转写行为时误删合法声明。
+def test_non_latin_holders_kept(tmp_path):
+    """西里尔、日文假名、谚文、希腊、泰、阿拉伯、印地等文字的声明保留。"""
+    statements = [
+        "© 2019 ООО «Ромашка»",
+        "© 2018 ソフトウェア",
+        "© 2020 한글",
+        "© 2020 Ελληνική Εταιρεία",
+        "© 2019 บริษัท",
+        "© 2019 شركة",
+        "© 2019 कंपनी",
+        "© 2019 กิน",
+        "© 2019 हिंदी",
+    ]
+    data = {"files": [fcopy("a.c", *statements, "(c) (c) L", "(c) 2020")]}
+    records = extract_and_duplicate_copyright(data, tmp_path / "o.txt")
+    assert records == statements
+
+
 @pytest.mark.parametrize("value, expected", [
     ("(c) (c) L", False),
     ("(c) 2020", False),
     ("(c) A", False),
     ("", False),
+    ("   ", False),
+    ("©", False),
     ("(c) 1999 Entrust.net Limited", True),
     ("(c) Casper da Costa-Luis", True),
     ("copr. 2019 Vendor GmbH", True),
@@ -168,6 +192,15 @@ def test_noise_filtered_before_dedup(tmp_path):
     ("Copyright (c) A", True),
     ("© 2020 Bar Corp", True),
     ("(c) HP", True),
+    ("© 2019 ООО «Ромашка»", True),
+    ("© 2018 ソフトウェア", True),
+    ("© 2020 한글", True),
+    ("© 2020 Ελληνική Εταιρεία", True),
+    ("© 2019 บริษัท", True),
+    ("© 2019 شركة", True),
+    ("© 2019 कंपनी", True),
+    ("© 2019 กิน", True),
+    ("© 2019 हिंदी", True),
 ])
 def test_is_meaningful_copyright(value, expected):
     assert _is_meaningful_copyright(value) is expected

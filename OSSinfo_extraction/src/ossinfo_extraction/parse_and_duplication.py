@@ -13,13 +13,29 @@
 # limitations under the License.
 
 import re
+import unicodedata
 from pathlib import Path
 
 from .logger import info
 from .config import COPYRIGHT_IGNORED_SUFFIXES
 
 _COPYRIGHT_MARKER = re.compile(r"(?i)\(c\)|©|copr\.")
-_MEANINGFUL_TOKEN = re.compile(r"[A-Za-z]{2,}|[一-鿿]{2,}")
+
+
+def _has_meaningful_letters(text: str, minimum: int = 2) -> bool:
+    """
+    判断文本中是否至少包含 minimum 个Unicode字母。
+
+    使用 unicodedata 的字母类别（L*）计数，覆盖拉丁、中日韩、西里尔、
+    希腊、阿拉伯、泰、印地等文字；数字、空白、标点和组合符号不计入。
+    """
+    count = 0
+    for char in text:
+        if unicodedata.category(char).startswith("L"):
+            count += 1
+            if count >= minimum:
+                return True
+    return False
 
 
 def _is_meaningful_copyright(value: str) -> bool:
@@ -28,13 +44,13 @@ def _is_meaningful_copyright(value: str) -> bool:
 
     ScanCode的copyright检测基于文本行解析，不区分代码、注释和字符串，
     可能把C宏中的 ``(c) == L`` 误识别为 ``(c) (c) L``。含copyright单词的
-    声明直接保留；否则去掉(c)/©/copr.标记后，要求至少2个字母或2个中文字符，
-    过滤掉只有单字母或纯数字的明显噪声。
+    声明直接保留；否则去掉(c)/©/copr.标记后，要求至少2个Unicode字母，
+    过滤掉只有单字母、数字或纯符号的明显噪声。
     """
     if re.search(r"(?i)copyright", value):
         return True
     remainder = _COPYRIGHT_MARKER.sub(" ", value)
-    return bool(_MEANINGFUL_TOKEN.search(remainder))
+    return _has_meaningful_letters(remainder)
 
 
 def extract_and_duplicate_copyright(
