@@ -93,6 +93,26 @@ class TestCommandAssembly:
         run_scancode(tmp_path / "target", result_json)
         assert "-l" not in seen["cmd"]
 
+    def test_copyright_flag_omitted_when_disabled(self, tmp_path, monkeypatch):
+        """重扫license时只加-l，不加-c。"""
+        result_json = tmp_path / "r.json"
+        seen = {}
+
+        def fake_run(cmd, stdout=None, stderr=None):
+            seen["cmd"] = list(cmd)
+
+            class R:
+                returncode = 0
+
+            return R()
+
+        monkeypatch.setattr("ossinfo_extraction.scancode.subprocess.run", fake_run)
+        result_json.write_text(json.dumps({"files": []}), encoding="utf-8")
+        run_scancode(tmp_path / "target", result_json,
+                     scan_license=True, scan_copyright=False)
+        assert seen["cmd"][1] == "-l"
+        assert "-c" not in seen["cmd"]
+
     def test_nonzero_exit_without_partial_raises(self, tmp_path, monkeypatch):
         result_json = tmp_path / "r.json"  # 不存在部分结果
 

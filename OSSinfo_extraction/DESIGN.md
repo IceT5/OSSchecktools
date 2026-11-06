@@ -165,6 +165,25 @@ License提取是工具的核心功能，涉及文件识别、误匹配过滤和�
 | 2 | LICENSES目录下的文件 | `LICENSES/MIT.txt` |
 | 3（最低） | 其他目录的文件 | `docs/LICENSE` |
 
+### 4. 非UTF-8 license名称修正
+
+ScanCode按原始字节识别license。GBK等非UTF-8文件会被其内部按Latin-1误解码，
+可能把标准许可证判成非SPDX的LicenseRef（例如双语木兰许可证被判成
+`LicenseRef-scancode-mulanpsl-2.0-en`而非`MulanPSL-2.0`）。
+
+`license_rescan.py` 在写报告前对最终选定的license记录做二次识别：
+
+1. 只处理最终记录的`file`对应的文件；UTF-8文件直接跳过；
+2. 用`_decode_license_text_with_status()`严格解码，替换解码或含NUL的文件跳过；
+3. 把解码文本写成UTF-8临时副本，用ScanCode只扫描license（不带`-c`）；
+4. pass2检出结果替换记录中的SPDX/表达式；检出失败保留第一遍结果；
+5. 用户显式`-l`时跳过重扫，以用户名称为准。
+
+`*_license`报告和`Readme.opensource`都从修正后的记录生成，两者名称一致。
+`Full License Text`仍由`readme_opensource.py`从原文件解码输出，不受影响。
+已知限制：UTF-16 LE+BOM等ScanCode零检出的文件不在最终记录中，无法通过
+重扫修正，需要人工核对。
+
 ---
 
 ## Copyright处理逻辑
@@ -295,7 +314,6 @@ Copyright处理模块，负责：
 ---
 
 ### license_extraction.py - License处理模块
-
 License处理模块，是工具的核心模块之一。
 
 **核心功能：**
@@ -312,6 +330,16 @@ License处理模块，是工具的核心模块之一。
 - `extract_licenses(result_json, output_txt, root_path)`：从scancode结果中提取license信息
 - `process_license_params(result_json, root_path, license_name, license_path)`：根据用户参数处理license
 - `write_license_report(output_txt, software_name, software_version, license_records)`：写入license报告
+
+---
+
+### license_rescan.py - License名称重扫模块
+
+对最终选定的非UTF-8 license文件做二次识别，修正ScanCode因编码误解产生的
+错误SPDX名称；只修改记录中的名称/表达式，不改变全文来源。
+
+**核心函数：**
+- `rescan_license_records(license_records, root_path, jobs, max_in_memory, user_license_name)`：重扫并原地修正记录
 
 ---
 

@@ -108,6 +108,8 @@ samplelib-1.2.3/
 - license全文定位读取（含根名前缀剥离、唯一子目录回退）
 - matched_text回退；无匹配时占位文案；无结尾换行补齐
 - 非UTF-8编码文件自动识别解码：UTF-8优先，GB2312/GBK回退GB18030，失败时按识别编码替换解码
+- 非UTF-8 license名称修正：GBK文件转UTF-8副本重扫，`*_license`与`Readme.opensource`名称一致；
+  UTF-8文件、用户`-l`、解码不精确、pass2无检出/异常时不做替换
 - license报告：段落格式、matched_text超500字符截断、空记录占位
 - -o输出目录多级自动创建；默认输出到target同级；失败清理回调删除旧产物
 

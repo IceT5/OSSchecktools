@@ -37,6 +37,49 @@ import chardet
 from .logger import info, debug
 
 
+def _decode_license_text_with_status(raw: bytes):
+    """
+    解码license文件内容，并返回解码是否精确。
+
+    Returns:
+        tuple[str, bool]: (解码文本, 是否严格解码成功)。发生替换解码时
+        第二个元素为False，调用方据此判断能否信任该文本（例如重扫license）。
+    """
+    text = None
+    exact = False
+    # 无BOM的UTF-16字节常含NUL，此时跳过UTF-8快路径
+    if b"\x00" not in raw:
+        try:
+            text = raw.decode("utf-8-sig")
+            exact = True
+        except UnicodeDecodeError:
+            pass
+
+    if text is None:
+        detected = chardet.detect(raw).get("encoding") or "utf-8"
+        candidates = [detected]
+        if detected.lower() in ("gb2312", "gbk"):
+            candidates.append("gb18030")
+
+        # 记录最后一个可用的编码，严格解码失败时用它做替换解码，
+        # 避免整份非UTF-8文件被当作UTF-8而全部变成替换符
+        last_valid = "utf-8"
+        for encoding in candidates:
+            try:
+                text = raw.decode(encoding)
+                exact = True
+                break
+            except UnicodeDecodeError:
+                last_valid = encoding
+            except LookupError:
+                continue
+        else:
+            text = raw.decode(last_valid, errors="replace")
+            exact = False
+
+    return text.replace("\r\n", "\n").replace("\r", "\n"), exact
+
+
 def _decode_license_text(raw: bytes) -> str:
     """
     自动识别license文件编码并解码。
@@ -55,35 +98,7 @@ def _decode_license_text(raw: bytes) -> str:
     Returns:
         str: 解码并统一换行后的文本
     """
-    text = None
-    # 无BOM的UTF-16字节常含NUL，此时跳过UTF-8快路径
-    if b"\x00" not in raw:
-        try:
-            text = raw.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            pass
-
-    if text is None:
-        detected = chardet.detect(raw).get("encoding") or "utf-8"
-        candidates = [detected]
-        if detected.lower() in ("gb2312", "gbk"):
-            candidates.append("gb18030")
-
-        # 记录最后一个可用的编码，严格解码失败时用它做替换解码，
-        # 避免整份非UTF-8文件被当作UTF-8而全部变成替换符
-        last_valid = "utf-8"
-        for encoding in candidates:
-            try:
-                text = raw.decode(encoding)
-                break
-            except UnicodeDecodeError:
-                last_valid = encoding
-            except LookupError:
-                continue
-        else:
-            text = raw.decode(last_valid, errors="replace")
-
-    return text.replace("\r\n", "\n").replace("\r", "\n")
+    return _decode_license_text_with_status(raw)[0]
 
 
 def _read_license_text(full_license_path: Path):

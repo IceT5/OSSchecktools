@@ -23,6 +23,7 @@ from .extract import run_extractcode
 from .scancode import run_scancode
 from .parse_and_duplication import extract_and_duplicate_copyright
 from .license_extraction import process_license_params, write_license_report
+from .license_rescan import rescan_license_records
 from .readme_opensource import write_readme_opensource
 from .cleanup import cleanup_extract_dir
 
@@ -286,7 +287,8 @@ def _scan_source(scan_target, result_json, jobs, max_in_memory):
                         jobs=jobs, max_in_memory=max_in_memory)
 
 
-def _write_reports(scan_data, scan_target, software_info, output_files, license_path, license_full_path):
+def _write_reports(scan_data, scan_target, software_info, output_files, license_path, license_full_path,
+                   jobs=4, max_in_memory=2000):
     software_name, software_version, license_name = software_info
     _, output_copyright, output_license, output_readme = output_files
     # 提取copyright信息
@@ -304,6 +306,16 @@ def _write_reports(scan_data, scan_target, software_info, output_files, license_
     # 检查是否有错误发生（用于非error_exit方式的错误）
     if has_error():
         error_exit("Errors occurred during processing, aborting.")
+
+    # 非UTF-8的license文件会被ScanCode按原始字节误解码，导致名称错误；
+    # 在写报告前用UTF-8副本重新识别一次，修正记录中的SPDX/表达式
+    rescan_license_records(
+        license_records,
+        scan_target,
+        jobs=jobs,
+        max_in_memory=max_in_memory,
+        user_license_name=license_name,
+    )
 
     # 写入license报告
     write_license_report(
@@ -460,7 +472,8 @@ def main():
         scan_data = _scan_source(scan_target, result_json, args.jobs, args.max_in_memory)
         _write_reports(scan_data, scan_target,
                        (software_name, software_version, license_name), output_files,
-                       license_path, license_full_path)
+                       license_path, license_full_path,
+                       jobs=args.jobs, max_in_memory=args.max_in_memory)
 
     except Exception as e:
         error("Pipeline failed, extracted directory will be kept for debugging.")

@@ -25,7 +25,11 @@ import codecs
 import pytest
 
 from ossinfo_extraction import readme_opensource
-from ossinfo_extraction.readme_opensource import _decode_license_text, _read_license_text
+from ossinfo_extraction.readme_opensource import (
+    _decode_license_text,
+    _decode_license_text_with_status,
+    _read_license_text,
+)
 
 MULTILINGUAL_SAMPLES = [
     ("simplified_chinese_gbk", "gbk",
@@ -203,3 +207,20 @@ def test_replace_fallback_uses_detected_encoding(monkeypatch):
     decoded = _decode_license_text(raw)
     assert "版权所有" in decoded
     assert decoded.count("�") == 1
+
+
+def test_decode_status_exact_for_utf8_and_gbk():
+    """UTF-8与GBK严格解码成功时状态为精确。"""
+    text, exact = _decode_license_text_with_status("Copyright José".encode("utf-8"))
+    assert exact is True and text == "Copyright José"
+
+    text, exact = _decode_license_text_with_status("版权所有 2020 华为\n".encode("gbk"))
+    assert exact is True and text == "版权所有 2020 华为\n"
+
+
+def test_decode_status_false_on_replacement(monkeypatch):
+    """发生替换解码时状态为不精确，调用方不得据此重扫。"""
+    monkeypatch.setattr(readme_opensource.chardet, "detect", lambda raw: {"encoding": None})
+    text, exact = _decode_license_text_with_status("版权".encode("gbk"))
+    assert exact is False
+    assert "�" in text

@@ -52,6 +52,7 @@ def run_scancode(
     jobs: int = 4,
     scan_license: bool = False,
     max_in_memory: int = 2000,
+    scan_copyright: bool = True,
 ):
     """
     Run ScanCode Toolkit.
@@ -64,6 +65,7 @@ def run_scancode(
         jobs: 并行任务数
         scan_license: 是否扫描license信息
         max_in_memory: 内存中缓存的文件扫描详情数量
+        scan_copyright: 是否扫描copyright信息
 
     Returns:
         dict: 解析后的ScanCode JSON结果数据
@@ -71,9 +73,12 @@ def run_scancode(
     Raises:
         RuntimeError: ScanCode执行失败且无法生成有效结果
     """
-    cmd = [
-        "scancode",
-        "-c",  # 扫描copyright
+    cmd = ["scancode"]
+    if scan_license:
+        cmd.append("-l")  # 扫描license
+    if scan_copyright:
+        cmd.append("-c")  # 扫描copyright
+    cmd.extend([
         "--only-findings",
         "--json-pp",
         str(result_json),
@@ -82,11 +87,7 @@ def run_scancode(
         str(jobs),
         "--max-in-memory",
         str(max_in_memory),
-    ]
-
-    # 添加license扫描参数
-    if scan_license:
-        cmd.insert(1, "-l")  # 扫描license
+    ])
 
     info("Running scancode:")
     log_cmd(" ".join(cmd))
