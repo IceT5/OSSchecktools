@@ -167,6 +167,16 @@ class TestNameSelect:
         assert got["spdx_identifier"] == "Zlib"
         assert got["file"] == ""
 
+    def test_licenseref_match_uses_user_spdx_name(self):
+        """"-l给出SPDX名称但检出为非SPDX的LicenseRef时，以用户名称为准。"""
+        files = [rec("pkg-1.0/LICENSE", "LicenseRef-scancode-mulanpsl-2.0-en",
+                     detected="mulanpsl-2.0-en")]
+        got = one(process_license_params(scan_data(files), Path(SIM_ROOT),
+                                         "MulanPSL-2.0", None))
+        assert got["spdx_identifier"] == "MulanPSL-2.0"
+        assert got["license_expression"] == "MulanPSL-2.0"
+        assert got["file"] == "pkg-1.0/LICENSE"
+
 
 class TestValidateNameAndPath:
     """-l+-p模式：名称与路径文件检出的一致性校验。"""
@@ -187,6 +197,16 @@ class TestValidateNameAndPath:
         got = one(process_license_params(
             scan_data(SHADOW), Path(SIM_ROOT), "MIT", "NOT-EXIST"))
         assert got["spdx_identifier"] == "MIT"
+
+    def test_licenseref_match_uses_user_spdx_name(self):
+        """-l+-p命中LicenseRef时，保留用户SPDX名称和检出文件。"""
+        files = [rec("pkg-1.0/LICENSE", "LicenseRef-scancode-mulanpsl-2.0-en",
+                     detected="mulanpsl-2.0-en")]
+        got = one(process_license_params(scan_data(files), Path(SIM_ROOT),
+                                         "MulanPSL-2.0", "LICENSE"))
+        assert got["spdx_identifier"] == "MulanPSL-2.0"
+        assert got["license_expression"] == "MulanPSL-2.0"
+        assert got["file"] == "pkg-1.0/LICENSE"
 
 
 class TestFullExtraction:

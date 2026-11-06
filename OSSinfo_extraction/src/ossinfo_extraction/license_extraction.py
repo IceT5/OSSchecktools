@@ -267,6 +267,8 @@ def _select_license_name_records(
     )
 
     if matching_records:
+        for record in matching_records:
+            _apply_user_name_for_non_spdx(record, license_name)
         license_records = matching_records
         info(f"Found {len(matching_records)} matching license record(s)")
     else:
@@ -375,6 +377,7 @@ def _validate_license_path_name(
 
         if is_match:
             info(f"License name '{license_name}' matches the license detected in file '{license_path}'")
+            _apply_user_name_for_non_spdx(matching_record, license_name)
             license_records = [matching_record]
         else:
             # 不匹配，输出警告但继续执行
@@ -575,6 +578,26 @@ def _license_name_matches(license_name_lower: str,
     """
     return (_mutually_contains(license_name_lower, detected_spdx.lower()) or
             _mutually_contains(license_name_lower, detected_license.lower()))
+
+
+def _is_non_spdx_reference(value: str) -> bool:
+    """判断检出是否为ScanCode的LicenseRef（非SPDX标识符）。"""
+    return value.strip().lower().startswith("licenseref-scancode-")
+
+
+def _apply_user_name_for_non_spdx(record: Dict[str, Any], license_name: str) -> None:
+    """
+    用户显式提供SPDX名称时，用其覆盖ScanCode的LicenseRef检出。
+
+    LicenseRef-scancode-* 是非SPDX引用；用户通过-l明确给出SPDX名称时，
+    即使子串匹配命中了LicenseRef，也应以用户名称为准，同时保留检出文件
+    以便从原文件读取全文。
+    """
+    detected_spdx = record.get("spdx_identifier", "")
+    detected_license = record.get("license_expression", "")
+    if _is_non_spdx_reference(detected_spdx) or _is_non_spdx_reference(detected_license):
+        record["spdx_identifier"] = license_name
+        record["license_expression"] = license_name
 
 
 def _detect_from_file_self(file_info: dict, file_path: str) -> bool:
