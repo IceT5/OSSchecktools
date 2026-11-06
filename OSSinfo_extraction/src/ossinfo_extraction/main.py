@@ -290,7 +290,7 @@ def _write_reports(scan_data, scan_target, software_info, output_files, license_
     software_name, software_version, license_name = software_info
     _, output_copyright, output_license, output_readme = output_files
     # 提取copyright信息
-    copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright, root_path=scan_target)
+    copyright_records = extract_and_duplicate_copyright(scan_data, output_copyright)
 
     # 处理license信息（始终调用process_license_params以执行校验）
     license_records = process_license_params(

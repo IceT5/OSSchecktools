@@ -97,15 +97,11 @@ samplelib-1.2.3/
 - 路径无有效检出时回退Unknown记录（后续从磁盘读全文）
 
 ### 版权声明提取
-- 来源上下文判断：pygments词法分析检出所在源文件，区间完全落在
-  注释/文档字符串内才保留；代码上下文（如C宏#define行）按误报丢弃
-- 不做内容判断：声明拼写形式（(c)/copr./Copyright(C)/中文等）不影响去留
-- fail-open契约：无root_path透传全部非空声明；无词法器（.pem等）、
-  源文件缺失、行号缺失、pygments缺失、文件过大时一律保留
+- 四种书写形式全保留：Copyright (c)/(c)/copr./Copyright (C)
+  （引擎将(C)归一化输出为(c)）
 - statement字段回退；copyright字段优先于statement
 - 空值/纯空白过滤；去重保持首次出现顺序
-- 文档类后缀全集跳过（.md/.rst/.txt/.adoc/.markdown，含大写）；
-  生成物/二进制后缀跳过（.pyc/.so/.class等）
+- 文档类后缀全集跳过（.md/.rst/.txt/.adoc/.markdown，含大写）
 
 ### 输出产物
 - Readme.opensource逐段格式（Software头/Copyright Notice(s)/License段）
