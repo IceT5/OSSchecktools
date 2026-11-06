@@ -153,7 +153,7 @@ cret -t package.zip -n "Software" -v "1.0.0" -l "Custom-License" -p "LICENSE"
 | 源代码中没有 copyright 声明 | 检查源文件，补充版权声明 |
 | 声明格式不标准 | 使用标准格式：`Copyright (c) 年份 作者` |
 | 只存在于文档文件中 | 文档中的 copyright 默认被过滤 |
-| 不包含 "copyright" 关键字 | 工具只保留包含关键字的信息 |
+| 声明位于代码上下文（而非注释） | 工具按来源上下文过滤代码中的误报检出，请确认声明写在注释或文档字符串内 |
 
 **调试方法：**
 ```bash
