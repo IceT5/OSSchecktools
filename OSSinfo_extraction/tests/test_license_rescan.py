@@ -415,3 +415,75 @@ def test_empty_user_license_name_still_rescans(tmp_path, monkeypatch):
     monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2())
     rescan_license_records(records, root, user_license_name="")
     assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+
+
+def test_record_with_extract_prefix(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    write_gbk(root)
+    records = [record("pkg.zip-extract/proj/LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2())
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+
+
+def test_record_absolute_path(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    license_file = write_gbk(root)
+    records = [record(str(license_file.resolve()))]
+    monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2())
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+
+
+def test_same_file_different_spellings_single_scan(tmp_path, monkeypatch):
+    root = tmp_path / "proj"
+    root.mkdir()
+    write_gbk(root)
+    records = [record("LICENSE"), record("proj/LICENSE")]
+    calls = []
+
+    def run(scan_target, result_json, **kwargs):
+        files = [p for p in scan_target.rglob("*") if p.is_file()]
+        assert len(files) == 1
+        calls.append(1)
+        return fake_pass2()(scan_target, result_json, **kwargs)
+
+    monkeypatch.setattr(license_rescan, "run_scancode", run)
+    rescan_license_records(records, root)
+    assert len(calls) == 1
+    assert [r["spdx_identifier"] for r in records] == ["MulanPSL-2.0", "MulanPSL-2.0"]
+
+
+def test_partial_multi_file_results_keep_other_record(tmp_path, monkeypatch):
+    root = tmp_path
+    (root / "a").mkdir()
+    (root / "b").mkdir()
+    (root / "a" / "LICENSE").write_bytes("木兰许可证\n".encode("gbk"))
+    (root / "b" / "LICENSE").write_bytes("木兰许可证\n".encode("gbk"))
+    records = [record("a/LICENSE"), record("b/LICENSE", spdx="LicenseRef-b", expression="b")]
+
+    monkeypatch.setattr(license_rescan, "run_scancode", lambda *a, **k: {"files": [{
+        "path": "files/f0000/LICENSE",
+        "detected_license_expression_spdx": "MIT",
+        "detected_license_expression": "mit",
+    }]})
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MIT"
+    assert records[1]["spdx_identifier"] == "LicenseRef-b"
+
+
+@pytest.mark.parametrize("exception", [ValueError, OSError])
+def test_run_scancode_other_exceptions_keep_records(tmp_path, monkeypatch, capsys, exception):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+
+    def fail(*args, **kwargs):
+        raise exception("boom")
+
+    monkeypatch.setattr(license_rescan, "run_scancode", fail)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+    assert "License re-scan failed" in capsys.readouterr().out

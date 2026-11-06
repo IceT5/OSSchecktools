@@ -200,3 +200,13 @@ def test_empty_records_no_rescan(tmp_path, monkeypatch):
                         None, None, jobs=3, max_in_memory=200)
     readme_text = output_files[3].read_text(encoding="utf-8")
     assert "License: No license information found." in readme_text
+
+
+def test_l_no_match_empty_file_no_rescan(tmp_path, monkeypatch):
+    rec = make_record(spdx="MulanPSL-2.0", expression="mulanpsl-2.0")
+    rec["file"] = ""
+    outputs = run_write_reports(tmp_path, monkeypatch, rec,
+                                license_name="MulanPSL-2.0", fake_scan=fail_scan)
+    report_names, readme_names = read_names(outputs)
+    assert report_names == {"MulanPSL-2.0"}
+    assert readme_names == report_names
