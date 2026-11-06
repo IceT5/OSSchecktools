@@ -36,7 +36,9 @@ from .scancode import run_scancode
 
 
 def _is_utf8(raw: bytes) -> bool:
-    """判断字节是否是合法UTF-8（含BOM）。"""
+    """判断字节是否是合法UTF-8文本（含BOM；含NUL的按非文本处理）。"""
+    if b"\x00" in raw:
+        return False
     try:
         raw.decode("utf-8-sig")
         return True
@@ -100,7 +102,12 @@ def rescan_license_records(
             continue
         if _is_utf8(raw):
             continue
-        text, exact = _decode_license_text_with_status(raw)
+        try:
+            text, exact = _decode_license_text_with_status(raw)
+        except Exception as e:
+            # 解码异常不能影响主流程，保留第一遍结果
+            debug(f"Failed to decode license file for re-scan {full_path}: {e}")
+            continue
         if not exact or "\x00" in text:
             debug(f"Skipped lossy/non-text license file for re-scan: {full_path}")
             continue
@@ -130,6 +137,9 @@ def rescan_license_records(
                 max_in_memory=max_in_memory,
                 scan_copyright=False,
             )
+            if not isinstance(data, dict):
+                warn("License re-scan returned no result, keeping first-pass results")
+                return license_records
 
             updated = 0
             for file_info in data.get("files", []):
@@ -142,14 +152,16 @@ def rescan_license_records(
                     continue
                 detected_spdx = file_info.get("detected_license_expression_spdx", "")
                 detected_expression = file_info.get("detected_license_expression", "")
-                if not detected_spdx and not detected_expression:
+                # 两个字段保持一致的名称：只有其一时互相回填，避免Readme
+                # 取spdx_identifier、license报告取expression导致两份输出不一致
+                new_spdx = detected_spdx or detected_expression
+                new_expression = detected_expression or detected_spdx
+                if not new_spdx and not new_expression:
                     continue
                 for idx in path_to_indices.get(full_path, []):
                     record = license_records[idx]
-                    if detected_spdx:
-                        record["spdx_identifier"] = detected_spdx
-                    if detected_expression:
-                        record["license_expression"] = detected_expression
+                    record["spdx_identifier"] = new_spdx
+                    record["license_expression"] = new_expression
                     updated += 1
 
             if updated:

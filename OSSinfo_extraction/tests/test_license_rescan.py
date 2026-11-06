@@ -21,6 +21,8 @@
 
 import pytest
 
+from pathlib import Path
+
 from ossinfo_extraction import license_rescan
 from ossinfo_extraction.license_rescan import rescan_license_records
 
@@ -161,3 +163,255 @@ def test_multiple_records_same_file_both_corrected(tmp_path, monkeypatch):
     rescan_license_records(records, root)
     assert [r["spdx_identifier"] for r in records] == ["MulanPSL-2.0", "MulanPSL-2.0"]
     assert [r["license_expression"] for r in records] == ["mulanpsl-2.0", "mulanpsl-2.0"]
+
+
+def fail_scan(*args, **kwargs):
+    raise AssertionError("re-scan should not be called")
+
+
+def test_empty_records_returns_without_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    records = []
+    assert rescan_license_records(records, tmp_path) is records
+
+
+def test_root_none_returns_without_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    records = [record("LICENSE")]
+    assert rescan_license_records(records, None) is records
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+@pytest.mark.parametrize("bad_record", [{}, {"file": ""}, {"file": None}])
+def test_record_without_file_skipped(tmp_path, monkeypatch, bad_record):
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    rescan_license_records([dict(bad_record)], tmp_path)
+
+
+def test_read_oserror_skips_file(tmp_path, monkeypatch, capsys):
+    root = tmp_path
+    blocked = write_gbk(root)
+    records = [record("LICENSE")]
+    original_read_bytes = Path.read_bytes
+
+    def fake_read_bytes(self):
+        if self == blocked:
+            raise PermissionError("denied")
+        return original_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", fake_read_bytes)
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+def test_decode_exception_skips_file(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+
+    def boom(raw):
+        raise ValueError("decode failed")
+
+    monkeypatch.setattr(license_rescan, "_decode_license_text_with_status", boom)
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+def test_decoded_text_with_nul_skipped(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(
+        license_rescan, "_decode_license_text_with_status", lambda raw: ("abc\x00def", True)
+    )
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+def test_pass2_path_with_scan_root_prefix(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode",
+                        fake_pass2(path="files/f0000/LICENSE"))
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+
+
+def test_pass2_path_with_backslash(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode",
+                        fake_pass2(path="files\\f0000\\LICENSE"))
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+
+
+def test_expression_only_updates_both_fields(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode",
+                        fake_pass2(spdx="", expression="mulanpsl-2.0"))
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "mulanpsl-2.0"
+    assert records[0]["license_expression"] == "mulanpsl-2.0"
+
+
+def test_spdx_only_updates_both_fields(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode",
+                        fake_pass2(spdx="MulanPSL-2.0", expression=""))
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+    assert records[0]["license_expression"] == "MulanPSL-2.0"
+
+
+def test_multiple_different_files_mapped_independently(tmp_path, monkeypatch):
+    root = tmp_path
+    (root / "a").mkdir()
+    (root / "b").mkdir()
+    (root / "a" / "LICENSE").write_bytes("木兰许可证\n".encode("gbk"))
+    (root / "b" / "LICENSE").write_bytes("木兰许可证\n".encode("gbk"))
+    records = [record("a/LICENSE"), record("b/LICENSE")]
+
+    def run(scan_target, result_json, **kwargs):
+        assert (scan_target / "f0000" / "LICENSE").is_file()
+        assert (scan_target / "f0001" / "LICENSE").is_file()
+        return {"files": [
+            {"path": "files/f0000/LICENSE",
+             "detected_license_expression_spdx": "MIT",
+             "detected_license_expression": "mit"},
+            {"path": "files/f0001/LICENSE",
+             "detected_license_expression_spdx": "Apache-2.0",
+             "detected_license_expression": "apache-2.0"},
+        ]}
+
+    monkeypatch.setattr(license_rescan, "run_scancode", run)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MIT"
+    assert records[1]["spdx_identifier"] == "Apache-2.0"
+
+
+def test_run_scancode_empty_dict_keeps_records(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode", lambda *a, **k: {})
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+def test_unmapped_result_path_skipped(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode", lambda *a, **k: {"files": [
+        {"path": "unrelated/LICENSE",
+         "detected_license_expression_spdx": "MIT",
+         "detected_license_expression": "mit"},
+        {},
+    ]})
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+def test_run_scancode_none_warns_and_keeps_records(tmp_path, monkeypatch, capsys):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode", lambda *a, **k: None)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+    assert "returned no result" in capsys.readouterr().out
+
+
+def test_temp_write_failure_keeps_records(tmp_path, monkeypatch, capsys):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "write_text", boom)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+    assert "License re-scan failed" in capsys.readouterr().out
+
+
+def test_jobs_passthrough_and_temp_result_outside_scan_dir(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    seen = {}
+
+    def run(scan_target, result_json, **kwargs):
+        seen["target"] = scan_target
+        seen["result"] = result_json
+        seen["kwargs"] = kwargs
+        return fake_pass2()(scan_target, result_json, **kwargs)
+
+    monkeypatch.setattr(license_rescan, "run_scancode", run)
+    rescan_license_records(records, root, jobs=7, max_in_memory=300)
+    assert seen["kwargs"]["jobs"] == 7
+    assert seen["kwargs"]["max_in_memory"] == 300
+    assert seen["kwargs"]["scan_license"] is True
+    assert seen["kwargs"]["scan_copyright"] is False
+    assert seen["result"].parent == seen["target"].parent
+    assert not str(seen["result"]).startswith(str(seen["target"]) + "/")
+    assert not seen["target"].parent.exists()  # 临时目录已清理
+
+
+def test_utf8_bom_and_ascii_skipped(tmp_path, monkeypatch):
+    root = tmp_path
+    (root / "LICENSE").write_bytes(b"\xef\xbb\xbfMIT License\n")
+    (root / "COPYING").write_bytes(b"MIT License\n")
+    records = [record("LICENSE", "MIT", "mit"), record("COPYING", "MIT", "mit")]
+    monkeypatch.setattr(license_rescan, "run_scancode", fail_scan)
+    rescan_license_records(records, root)
+    assert [r["spdx_identifier"] for r in records] == ["MIT", "MIT"]
+
+
+def test_nul_containing_utf16_bytes_not_treated_as_utf8():
+    assert license_rescan._is_utf8("MIT License".encode("utf-16-le")) is False
+
+
+def test_latin1_file_rescanned(tmp_path, monkeypatch):
+    root = tmp_path
+    (root / "LICENSE").write_bytes("Copyright (c) Élastique\n".encode("latin-1"))
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2(spdx="MIT", expression="mit"))
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MIT"
+
+
+def test_gb18030_four_byte_char_rescanned(tmp_path, monkeypatch):
+    root = tmp_path
+    text = "木兰许可证\n" * 10 + "扩展字符𠀀\n"
+    (root / "LICENSE").write_bytes(text.encode("gb18030"))
+    records = [record("LICENSE")]
+
+    def run(scan_target, result_json, **kwargs):
+        temp_text = (scan_target / "f0000" / "LICENSE").read_text(encoding="utf-8")
+        assert "𠀀" in temp_text
+        return fake_pass2()(scan_target, result_json, **kwargs)
+
+    monkeypatch.setattr(license_rescan, "run_scancode", run)
+    rescan_license_records(records, root)
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
+
+
+def test_empty_user_license_name_still_rescans(tmp_path, monkeypatch):
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE")]
+    monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2())
+    rescan_license_records(records, root, user_license_name="")
+    assert records[0]["spdx_identifier"] == "MulanPSL-2.0"
