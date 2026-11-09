@@ -19,11 +19,14 @@ from pathlib import Path
 from .logger import info
 from .config import COPYRIGHT_IGNORED_SUFFIXES
 
-_COPYRIGHT_MARKER = re.compile(r"(?i)\(c\)|©|copr\.")
-# 版权特征：copyright关键字、(c)/©/copr.标记、中文"版权/著作"、年份。
-# ScanCode检出的行几乎都含其一；完全不含特征的普通语句不应按版权输出。
+_COPYRIGHT_MARKER = re.compile(r"(?i)\(c\)|©|copr\.?")
+# 版权特征：对齐ScanCode 32.5.0 COPYRIGHT词元的全部关键字变体
+# （copyright/Copyrighy/Copyirght/Cppyright/(c)opy*/opy*/copr），外加
+# (c)/©标记、中文"版权/著作"和年份。不含任何特征的普通语句不应按
+# 版权输出；ScanCode可检出的声明必然含其一。
 _COPYRIGHT_FEATURE = re.compile(
-    r"(?i)copyright|\(c\)|©|copr\.|版权|著作|(?:19|20)\d{2}"
+    r"(?i)copyr(ight|ighy|irght)|cppyright|opyr|opyl|copr\.?"
+    r"|\(c\)|©|版权|著作|(?:19|20)\d{2}"
 )
 
 

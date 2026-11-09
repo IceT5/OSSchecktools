@@ -203,6 +203,10 @@ def test_non_latin_holders_kept(tmp_path):
     ("© 2019 हिंदी", True),
     ("this project uses fonts", False),
     ("2020 Foo Bar", True),
+    ("copr Foo Corp", True),
+    ("Copyrighy Foo Corp", True),
+    ("opylefted Foo Corp", True),
+    ("copr A", False),
 ])
 def test_is_meaningful_copyright(value, expected):
     assert _is_meaningful_copyright(value) is expected
