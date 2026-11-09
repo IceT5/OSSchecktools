@@ -329,7 +329,8 @@ def _clean_license_path(license_file_path: str, root_path: Path) -> str:
     for i, part in enumerate(path_parts):
         if part == root_name:
             # 返回该位置之后的路径
-            return "/".join(path_parts[i + 1 :])
+            start = i + 1
+            return "/".join(path_parts[start:])
 
     # 如果没找到，尝试查找常见的解压目录模式
     start_idx = 0

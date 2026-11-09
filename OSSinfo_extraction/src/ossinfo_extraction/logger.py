@@ -159,7 +159,8 @@ def error_exit(message: str, exit_code: int = 1) -> None:
             f"[ERROR] {_software_name} {_software_version} Readme.opensource生成失败，请修改完成后重新执行"
         )
         print(
-            f"[ERROR] {_software_name} {_software_version} Readme.opensource generation failed. Please fix the issue and try again."
+            f"[ERROR] {_software_name} {_software_version} "
+            "Readme.opensource generation failed. Please fix the issue and try again."
         )
     else:
         print("[ERROR] Readme.opensource生成失败，请修改完成后重新执行")
