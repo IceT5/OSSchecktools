@@ -99,6 +99,16 @@ def test_latin1_text_preserved():
     assert "lastique" in _decode_license_text(text.encode("latin-1"))
 
 
+def test_single_byte_guess_decode_not_trusted():
+    """chardet判为单字节编码时exact=False：该字节序列可能被猜成任意
+    单字节编码（实测本例被猜为阿拉伯系，É解码为ﺓ乱码），"严格成功"
+    不代表编码正确，因此不可作为重扫依据；全文输出仍使用解码文本。"""
+    text, exact = _decode_license_text_with_status(
+        "Copyright (c) Élastique\n".encode("latin-1")
+    )
+    assert exact is False
+
+
 @pytest.mark.parametrize("text, encoding", [
     ("LICENSE\r\nline2\r\n", "utf-8"),
     ("LICENSE\r\n版权所有\r\n", "gbk"),
