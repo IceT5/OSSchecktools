@@ -17,15 +17,15 @@ import os
 import argparse
 from pathlib import Path
 
-from .logger import info, ok, warn, error, debug, has_error, error_exit, register_cleanup_callback, set_software_info
-from .prerequisite import check_scancode_available
-from .extract import run_extractcode
-from .scancode import run_scancode
-from .parse_and_duplication import extract_and_duplicate_copyright
-from .license_extraction import process_license_params, write_license_report
-from .license_rescan import rescan_license_records
-from .readme_opensource import write_readme_opensource
-from .cleanup import cleanup_extract_dir
+from ossinfo_extraction.logger import info, ok, warn, error, debug, has_error, error_exit, register_cleanup_callback, set_software_info
+from ossinfo_extraction.prerequisite import check_scancode_available
+from ossinfo_extraction.extract import run_extractcode
+from ossinfo_extraction.scancode import run_scancode
+from ossinfo_extraction.parse_and_duplication import extract_and_duplicate_copyright
+from ossinfo_extraction.license_extraction import process_license_params, write_license_report
+from ossinfo_extraction.license_rescan import rescan_license_records
+from ossinfo_extraction.readme_opensource import write_readme_opensource
+from ossinfo_extraction.cleanup import cleanup_extract_dir
 
 
 def print_guide():
