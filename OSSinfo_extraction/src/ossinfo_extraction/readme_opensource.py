@@ -36,14 +36,45 @@ import chardet
 
 from .logger import info, debug
 
+# chardet判定为这些多字节编码且严格解码成功时，解码结果才视为可信；
+# 单字节猜测编码（latin-1/windows-125x/koi8等）对任意字节总能"严格
+# 成功"，不代表编码判断正确（GBK字节被判成Windows-1252时中文已乱码），
+# 调用方（如license重扫）不应据此覆盖第一遍结果。
+_TRUSTED_MULTIBYTE_ENCODINGS = {
+    "gb2312",
+    "gbk",
+    "gb18030",
+    "big5",
+    "big5-hkscs",
+    "euc-jp",
+    "shift-jis",
+    "iso-2022-jp",
+    "euc-kr",
+    "uhc",
+    "johab",
+    "utf-16",
+    "utf-16be",
+    "utf-16le",
+    "utf-32",
+    "utf-32be",
+    "utf-32le",
+}
+
+
+def _is_trusted_decoding(encoding: str) -> bool:
+    """判断chardet识别出的编码是否足以信任解码结果。"""
+    return encoding.lower().replace("_", "-") in _TRUSTED_MULTIBYTE_ENCODINGS
+
 
 def _decode_license_text_with_status(raw: bytes):
     """
     解码license文件内容，并返回解码是否精确。
 
     Returns:
-        tuple[str, bool]: (解码文本, 是否严格解码成功)。发生替换解码时
-        第二个元素为False，调用方据此判断能否信任该文本（例如重扫license）。
+        tuple[str, bool]: (解码文本, 解码结果是否可信)。替换解码、或
+        chardet仅给出单字节猜测编码（对任意字节都能"严格成功"，不代表
+        编码正确）时为False，调用方据此判断能否信任该文本（例如重扫
+        license）。
     """
     text = None
     exact = False
@@ -67,7 +98,7 @@ def _decode_license_text_with_status(raw: bytes):
         for encoding in candidates:
             try:
                 text = raw.decode(encoding)
-                exact = True
+                exact = _is_trusted_decoding(encoding)
                 break
             except UnicodeDecodeError:
                 last_valid = encoding
@@ -298,7 +329,7 @@ def _clean_license_path(license_file_path: str, root_path: Path) -> str:
     for i, part in enumerate(path_parts):
         if part == root_name:
             # 返回该位置之后的路径
-            return "/".join(path_parts[i+1:])
+            return "/".join(path_parts[i + 1 :])
 
     # 如果没找到，尝试查找常见的解压目录模式
     start_idx = 0

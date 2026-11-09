@@ -16,11 +16,12 @@ import sys
 import json
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from .logger import info, warn, cmd as log_cmd
 
 
-def _load_partial_result(result_json: Path, exit_code: int) -> dict:
+def _load_partial_result(result_json: Path, exit_code: int) -> Optional[dict]:
     """
     非零退出码时尝试读取已生成的部分有效扫描结果。
 
@@ -41,8 +42,10 @@ def _load_partial_result(result_json: Path, exit_code: int) -> dict:
     file_count = len(data.get("files", []))
     if file_count <= 0:
         return None
-    warn(f"ScanCode reported errors (exit code {exit_code}), "
-         f"but produced valid results with {file_count} files scanned. Continuing.")
+    warn(
+        f"ScanCode reported errors (exit code {exit_code}), "
+        f"but produced valid results with {file_count} files scanned. Continuing."
+    )
     return data
 
 
@@ -78,16 +81,18 @@ def run_scancode(
         cmd.append("-l")  # 扫描license
     if scan_copyright:
         cmd.append("-c")  # 扫描copyright
-    cmd.extend([
-        "--only-findings",
-        "--json-pp",
-        str(result_json),
-        str(scan_target),
-        "-n",
-        str(jobs),
-        "--max-in-memory",
-        str(max_in_memory),
-    ])
+    cmd.extend(
+        [
+            "--only-findings",
+            "--json-pp",
+            str(result_json),
+            str(scan_target),
+            "-n",
+            str(jobs),
+            "--max-in-memory",
+            str(max_in_memory),
+        ]
+    )
 
     info("Running scancode:")
     log_cmd(" ".join(cmd))

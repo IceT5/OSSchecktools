@@ -17,6 +17,7 @@ from pathlib import Path
 
 from .logger import info, ok, warn
 
+
 def cleanup_extract_dir(extract_dir: Path):
     """
     Safety delete extractcode path, if target is not archive, skip this function
@@ -31,7 +32,9 @@ def cleanup_extract_dir(extract_dir: Path):
 
     # 额外安全校验：目录名必须以 -extract 结尾
     if not extract_dir.name.endswith("-extract"):
-        warn(f"Directory name does not end with '-extract', skip cleanup: {extract_dir}")
+        warn(
+            f"Directory name does not end with '-extract', skip cleanup: {extract_dir}"
+        )
         return
 
     try:

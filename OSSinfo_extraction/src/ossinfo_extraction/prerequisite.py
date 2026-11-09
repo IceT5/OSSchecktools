@@ -29,7 +29,7 @@ def check_scancode_available():
             ["scancode", "--version"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
     except FileNotFoundError:
         raise RuntimeError(

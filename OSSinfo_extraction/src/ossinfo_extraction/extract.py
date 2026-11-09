@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .logger import info, cmd as log_cmd
 
+
 def run_extractcode(target: str) -> Path:
     """
     When target is an archive, execute this function.
@@ -31,8 +32,8 @@ def run_extractcode(target: str) -> Path:
 
     custom_tmp = Path(tempfile.mkdtemp(prefix="scancode_tmp_", dir=str(archive.parent)))
     env = os.environ.copy()
-    env['TMP'] = str(custom_tmp)
-    env['TEMP'] = str(custom_tmp)
+    env["TMP"] = str(custom_tmp)
+    env["TEMP"] = str(custom_tmp)
 
     cmd = [
         "extractcode",
@@ -57,9 +58,7 @@ def run_extractcode(target: str) -> Path:
         extract_dir = archive.parent / f"{archive.name}-extract"
 
         if not extract_dir.exists():
-            raise RuntimeError(
-                f"Expected extract directory not found: {extract_dir}"
-            )
+            raise RuntimeError(f"Expected extract directory not found: {extract_dir}")
     finally:
         shutil.rmtree(custom_tmp, ignore_errors=True)
 

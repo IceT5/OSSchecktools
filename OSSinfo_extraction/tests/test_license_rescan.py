@@ -383,13 +383,47 @@ def test_nul_containing_utf16_bytes_not_treated_as_utf8():
     assert license_rescan._is_utf8("MIT License".encode("utf-16-le")) is False
 
 
-def test_latin1_file_rescanned(tmp_path, monkeypatch):
+def test_latin1_file_skipped_from_rescan(tmp_path, monkeypatch):
+    """单字节猜测编码（latin-1）的解码不可信：不参与重扫。
+
+    真latin-1文件第一遍ScanCode就是按正确字节语义识别的，无需重扫；
+    GBK被误判为latin-1时，用乱码文本重扫只会复现错误结果。
+    """
     root = tmp_path
     (root / "LICENSE").write_bytes("Copyright (c) Élastique\n".encode("latin-1"))
     records = [record("LICENSE")]
-    monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2(spdx="MIT", expression="mit"))
+
+    def fail(*args, **kwargs):
+        raise AssertionError("single-byte decoded file must not be re-scanned")
+
+    monkeypatch.setattr(license_rescan, "run_scancode", fail)
     rescan_license_records(records, root)
-    assert records[0]["spdx_identifier"] == "MIT"
+    assert records[0]["spdx_identifier"] == "LicenseRef-scancode-old"
+
+
+def test_unchanged_second_pass_not_counted_as_corrected(tmp_path, monkeypatch, capsys):
+    """二次识别结果与第一遍相同时不计入"已修正"，不打成功日志。"""
+    root = tmp_path
+    write_gbk(root)
+    records = [record("LICENSE", spdx="MulanPSL-2.0", expression="mulanpsl-2.0")]
+    monkeypatch.setattr(
+        license_rescan, "run_scancode",
+        fake_pass2(spdx="MulanPSL-2.0", expression="mulanpsl-2.0"),
+    )
+    rescan_license_records(records, root)
+    assert "corrected" not in capsys.readouterr().out
+
+
+def test_preprocess_exception_keeps_records(tmp_path, monkeypatch, capsys):
+    """预处理阶段（分组/筛选）异常同样被兜底：告警并返回原记录。"""
+    root = tmp_path
+    write_gbk(root)
+    records = [{"file": 123, "spdx_identifier": "X", "license_expression": "x",
+                "matched_text": ""}]
+    monkeypatch.setattr(license_rescan, "run_scancode", fake_pass2())
+    rescan_license_records(records, root)
+    assert records[0]["file"] == 123
+    assert "License re-scan failed" in capsys.readouterr().out
 
 
 def test_gb18030_four_byte_char_rescanned(tmp_path, monkeypatch):

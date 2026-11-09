@@ -20,6 +20,11 @@ from .logger import info
 from .config import COPYRIGHT_IGNORED_SUFFIXES
 
 _COPYRIGHT_MARKER = re.compile(r"(?i)\(c\)|©|copr\.")
+# 版权特征：copyright关键字、(c)/©/copr.标记、中文"版权/著作"、年份。
+# ScanCode检出的行几乎都含其一；完全不含特征的普通语句不应按版权输出。
+_COPYRIGHT_FEATURE = re.compile(
+    r"(?i)copyright|\(c\)|©|copr\.|版权|著作|(?:19|20)\d{2}"
+)
 
 
 def _has_meaningful_letters(text: str, minimum: int = 2) -> bool:
@@ -43,10 +48,14 @@ def _is_meaningful_copyright(value: str) -> bool:
     判断ScanCode检出的copyright是否像有效声明。
 
     ScanCode的copyright检测基于文本行解析，不区分代码、注释和字符串，
-    可能把C宏中的 ``(c) == L`` 误识别为 ``(c) (c) L``。含copyright单词的
-    声明直接保留；否则去掉(c)/©/copr.标记后，要求至少2个Unicode字母，
-    过滤掉只有单字母、数字或纯符号的明显噪声。
+    可能把C宏中的 ``(c) == L`` 误识别为 ``(c) (c) L``。先要求文本具备
+    版权特征（copyright关键字、(c)/©/copr.标记、中文"版权/著作"、年份），
+    不具备的直接排除，避免普通语句仅凭含2个字母就被当作版权声明；
+    含copyright单词的声明直接保留；否则去掉(c)/©/copr.标记后，要求至少
+    2个Unicode字母，过滤掉只有单字母、数字或纯符号的明显噪声。
     """
+    if not _COPYRIGHT_FEATURE.search(value):
+        return False
     if re.search(r"(?i)copyright", value):
         return True
     remainder = _COPYRIGHT_MARKER.sub(" ", value)
@@ -79,10 +88,7 @@ def extract_and_duplicate_copyright(
             continue
 
         for copyright_info in file_info.get("copyrights", []):
-            value = (
-                copyright_info.get("copyright")
-                or copyright_info.get("statement")
-            )
+            value = copyright_info.get("copyright") or copyright_info.get("statement")
             if not value:
                 continue
 

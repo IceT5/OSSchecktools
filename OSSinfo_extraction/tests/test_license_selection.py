@@ -177,6 +177,37 @@ class TestNameSelect:
         assert got["license_expression"] == "MulanPSL-2.0"
         assert got["file"] == "pkg-1.0/LICENSE"
 
+    def test_empty_expression_does_not_match_any_name(self):
+        """license_expression为空串时不与任意-l名称互含命中（此前恒真）。"""
+        files = [{
+            "path": "pkg-1.0/LICENSE",
+            "detected_license_expression_spdx": "MIT",
+            "detected_license_expression": "",
+            "license_detections": [{"matches": [{
+                "rule_identifier": "mit.LICENSE",
+                "matched_length": 100,
+                "matched_text": "TEXT",
+            }]}],
+        }]
+        records = process_license_params(scan_data(files), Path(SIM_ROOT),
+                                         "FooBar", None)
+        # 名称未命中 → 保留用户名称的兜底记录
+        assert records[0]["spdx_identifier"] == "FooBar"
+        assert records[0]["file"] == ""
+
+    def test_license_ref_override_deduped_by_final_name(self):
+        """不同LicenseRef被-l覆盖为同一名称后，按最终名称去重只留一条。"""
+        files = [
+            rec("pkg-1.0/LICENSE.old", "LicenseRef-scancode-mit-old-style",
+                detected="mit-old-style"),
+            rec("pkg-1.0/LICENSE.0", "LicenseRef-scancode-mit-0",
+                detected="mit-0"),
+        ]
+        records = process_license_params(scan_data(files), Path(SIM_ROOT),
+                                         "MIT", None)
+        assert len(records) == 1
+        assert records[0]["spdx_identifier"] == "MIT"
+
 
 class TestValidateNameAndPath:
     """-l+-p模式：名称与路径文件检出的一致性校验。"""

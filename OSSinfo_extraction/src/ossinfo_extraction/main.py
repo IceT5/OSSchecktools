@@ -13,19 +13,26 @@
 # limitations under the License.
 
 import sys
-import os
 import argparse
 from pathlib import Path
 
 from ossinfo_extraction.logger import (
-    info, ok, warn, error, debug, has_error, error_exit,
-    register_cleanup_callback, set_software_info,
+    info,
+    error,
+    debug,
+    has_error,
+    error_exit,
+    register_cleanup_callback,
+    set_software_info,
 )
 from ossinfo_extraction.prerequisite import check_scancode_available
 from ossinfo_extraction.extract import run_extractcode
 from ossinfo_extraction.scancode import run_scancode
 from ossinfo_extraction.parse_and_duplication import extract_and_duplicate_copyright
-from ossinfo_extraction.license_extraction import process_license_params, write_license_report
+from ossinfo_extraction.license_extraction import (
+    process_license_params,
+    write_license_report,
+)
 from ossinfo_extraction.license_rescan import rescan_license_records
 from ossinfo_extraction.readme_opensource import write_readme_opensource
 from ossinfo_extraction.cleanup import cleanup_extract_dir
@@ -177,66 +184,70 @@ or directories and generates a standardized Readme.opensource file.
 def _add_required_args(parser):
     """添加必填参数"""
     parser.add_argument(
-        "-t", "--target",
+        "-t",
+        "--target",
         required=True,
-        help="Target file or directory to analyze / 目标文件或目录路径 (e.g., package.zip)"
+        help="Target file or directory to analyze / 目标文件或目录路径 (e.g., package.zip)",
     )
     parser.add_argument(
-        "-n", "--name",
-        required=True,
-        help="Software name / 软件名称 (required)"
+        "-n", "--name", required=True, help="Software name / 软件名称 (required)"
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         required=True,
-        help="Software version / 软件版本号 (required)"
+        help="Software version / 软件版本号 (required)",
     )
 
 
 def _add_license_args(parser):
     """添加license相关可选参数"""
     parser.add_argument(
-        "-l", "--license",
+        "-l",
+        "--license",
         dest="license_name",
         default=None,
-        help="License name (SPDX identifier) / 许可证名称，如 MIT, Apache-2.0"
+        help="License name (SPDX identifier) / 许可证名称，如 MIT, Apache-2.0",
     )
     parser.add_argument(
-        "-p", "--license-path",
+        "-p",
+        "--license-path",
         dest="license_path",
         default=None,
-        help="Relative path to license file / 许可证文件相对路径"
+        help="Relative path to license file / 许可证文件相对路径",
     )
 
 
 def _add_output_args(parser):
     """添加输出相关可选参数"""
     parser.add_argument(
-        "-o", "--output-dir",
+        "-o",
+        "--output-dir",
         dest="output_dir",
         default=None,
-        help="Output directory for results / 输出目录 (default: same as target)"
+        help="Output directory for results / 输出目录 (default: same as target)",
     )
     parser.add_argument(
         "--guide",
         action="store_true",
-        help="Show detailed usage guide / 显示详细使用指南"
+        help="Show detailed usage guide / 显示详细使用指南",
     )
 
 
 def _add_scancode_args(parser):
     """添加ScanCode相关可选参数"""
     parser.add_argument(
-        "-j", "--jobs",
+        "-j",
+        "--jobs",
         type=int,
         default=4,
-        help="Number of parallel ScanCode processes / ScanCode并行进程数 (default: 4)"
+        help="Number of parallel ScanCode processes / ScanCode并行进程数 (default: 4)",
     )
     parser.add_argument(
         "--max-in-memory",
         type=int,
         default=2000,
-        help="Max files cached in memory by ScanCode / ScanCode内存缓存文件数 (default: 2000)"
+        help="Max files cached in memory by ScanCode / ScanCode内存缓存文件数 (default: 2000)",
     )
 
 
@@ -244,7 +255,7 @@ def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
         description="Extract copyright and license information from source code archives. "
-                    "\n提取源代码压缩包中的版权和许可证信息。",
+        "\n提取源代码压缩包中的版权和许可证信息。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples / 示例:
@@ -255,7 +266,7 @@ Examples / 示例:
 
 Run 'cret --guide' for detailed usage instructions.
 运行 'cret --guide' 查看详细使用指南。
-        """
+        """,
     )
 
     _add_required_args(parser)
@@ -286,12 +297,25 @@ def _log_software_info(software_name, software_version, license_name, license_pa
 def _scan_source(scan_target, result_json, jobs, max_in_memory):
     check_scancode_available()
     # run_scancode直接返回解析后的JSON数据（扫描失败但已生成部分有效结果时，告警后继续）
-    return run_scancode(scan_target, result_json, scan_license=True,
-                        jobs=jobs, max_in_memory=max_in_memory)
+    return run_scancode(
+        scan_target,
+        result_json,
+        scan_license=True,
+        jobs=jobs,
+        max_in_memory=max_in_memory,
+    )
 
 
-def _write_reports(scan_data, scan_target, software_info, output_files,
-                   license_path, license_full_path, jobs=4, max_in_memory=2000):
+def _write_reports(
+    scan_data,
+    scan_target,
+    software_info,
+    output_files,
+    license_path,
+    license_full_path,
+    jobs=4,
+    max_in_memory=2000,
+):
     software_name, software_version, license_name = software_info
     _, output_copyright, output_license, output_readme = output_files
     # 提取copyright信息
@@ -470,13 +494,23 @@ def main():
     try:
         extract_dir, scan_target = _prepare_scan_target(target)
 
-        license_path, license_full_path = _normalize_license_path(scan_target, license_path)
+        license_path, license_full_path = _normalize_license_path(
+            scan_target, license_path
+        )
 
-        scan_data = _scan_source(scan_target, result_json, args.jobs, args.max_in_memory)
-        _write_reports(scan_data, scan_target,
-                       (software_name, software_version, license_name), output_files,
-                       license_path, license_full_path,
-                       jobs=args.jobs, max_in_memory=args.max_in_memory)
+        scan_data = _scan_source(
+            scan_target, result_json, args.jobs, args.max_in_memory
+        )
+        _write_reports(
+            scan_data,
+            scan_target,
+            (software_name, software_version, license_name),
+            output_files,
+            license_path,
+            license_full_path,
+            jobs=args.jobs,
+            max_in_memory=args.max_in_memory,
+        )
 
     except Exception as e:
         error("Pipeline failed, extracted directory will be kept for debugging.")
@@ -489,6 +523,7 @@ def main():
         # 暂时保留result.json用于调试
         # os.remove(result_json)
         debug(f"Result JSON kept at: {result_json}")
+
 
 if __name__ == "__main__":
     main()

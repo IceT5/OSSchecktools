@@ -137,6 +137,13 @@ def _apply_rescan_results(
             continue
         for idx in path_to_indices.get(full_path, []):
             record = license_records[idx]
+            # 只统计真正发生变化的记录，避免二次识别结果与第一遍相同时
+            # 打出误导性的"已修正"日志
+            if (record.get("spdx_identifier"), record.get("license_expression")) == (
+                new_spdx,
+                new_expression,
+            ):
+                continue
             record["spdx_identifier"] = new_spdx
             record["license_expression"] = new_expression
             updated += 1
@@ -200,12 +207,11 @@ def rescan_license_records(
     if not license_records or user_license_name or root_path is None:
         return license_records
 
-    path_to_indices = _group_records_by_file(license_records, root_path)
-    candidates = _collect_rescan_candidates(path_to_indices)
-    if not candidates:
-        return license_records
-
     try:
+        path_to_indices = _group_records_by_file(license_records, root_path)
+        candidates = _collect_rescan_candidates(path_to_indices)
+        if not candidates:
+            return license_records
         updated = _rescan_candidates(
             candidates, path_to_indices, license_records, jobs, max_in_memory
         )
@@ -215,6 +221,8 @@ def rescan_license_records(
                 f"corrected {updated} license record(s)"
             )
     except Exception as e:
+        # 重扫任何阶段（含分组、筛选等预处理）的异常都不能中断已成功的
+        # 首轮结果与报告输出
         warn(f"License re-scan failed, keeping first-pass results: {e}")
 
     return license_records

@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 from typing import Set, List, Dict, Any, Optional
 
-from .logger import info, ok, warn, error, debug, error_exit
+from .logger import info, warn, debug
 from .config import LICENSE_FILE_PATTERNS, LICENSE_EXTENSIONS
 
 # SPDX版本后缀文法：数字版本号 + 可选字母尾（如.3c）+ 可选SPDX限定符
@@ -105,8 +105,9 @@ def is_license_file(filename: str) -> bool:
         # 重新匹配license模式确认；其余扩展名仍然拒绝
         if SPDX_VERSION_SUFFIX.fullmatch(ext):
             full_name = filename.lower()
-            if not any(re.match(p, full_name, re.IGNORECASE)
-                       for p in LICENSE_FILE_PATTERNS):
+            if not any(
+                re.match(p, full_name, re.IGNORECASE) for p in LICENSE_FILE_PATTERNS
+            ):
                 return False
         else:
             return False
@@ -192,7 +193,9 @@ def process_license_params(
         List[Dict]: 提取的license信息列表
     """
     # 获取扫描的根目录
-    scanned_root = (data.get("headers") or [{}])[0].get("options", {}).get("input") or [None]
+    scanned_root = (data.get("headers") or [{}])[0].get("options", {}).get("input") or [
+        None
+    ]
     scanned_root = scanned_root[0]
     if root_path is None:
         root_path = Path(scanned_root) if scanned_root else None
@@ -228,7 +231,12 @@ def process_license_params(
     if license_name and license_path:
         # 同时指定license名称和license文件路径：校验是否匹配
         return _validate_license_path_name(
-            data, target_license_files, license_name, license_path, root_path, license_full_path
+            data,
+            target_license_files,
+            license_name,
+            license_path,
+            root_path,
+            license_full_path,
         )
 
     # 都不填：执行完整license提取
@@ -238,7 +246,9 @@ def process_license_params(
     )
 
     # 提示用户人工核对
-    warn("请人工核对许可证信息是否准确 / Please manually verify the license information is accurate")
+    warn(
+        "请人工核对许可证信息是否准确 / Please manually verify the license information is accurate"
+    )
     return license_records
 
 
@@ -269,22 +279,30 @@ def _select_license_name_records(
     if matching_records:
         for record in matching_records:
             _apply_user_name_for_non_spdx(record, license_name)
-        license_records = matching_records
-        info(f"Found {len(matching_records)} matching license record(s)")
+        # 覆盖可能把不同的LicenseRef改写成同一用户名称，
+        # 需按最终名称重新分组去重，避免同名记录重复进入报告
+        license_records = _dedup_by_final_name(matching_records)
+        info(f"Found {len(license_records)} matching license record(s)")
     else:
         # 用户指定了license名称但未匹配到，输出警告但继续执行
         warn(f"No license file found matching name: {license_name}")
-        warn("Please check if the license name is a valid SPDX identifier (e.g., MIT, Apache-2.0, GPL-3.0)")
+        warn(
+            "Please check if the license name is a valid SPDX identifier (e.g., MIT, Apache-2.0, GPL-3.0)"
+        )
         # 使用用户提供的license名称，继续生成Readme.opensource
-        license_records = [{
-            "file": "",
-            "spdx_identifier": license_name,
-            "license_expression": license_name,
-            "matched_text": "",
-        }]
+        license_records = [
+            {
+                "file": "",
+                "spdx_identifier": license_name,
+                "license_expression": license_name,
+                "matched_text": "",
+            }
+        ]
 
     # 提示用户人工核对
-    warn("请人工核对许可证信息是否准确 / Please manually verify the license information is accurate")
+    warn(
+        "请人工核对许可证信息是否准确 / Please manually verify the license information is accurate"
+    )
     return license_records
 
 
@@ -312,9 +330,7 @@ def _select_license_path_record(
 
     # 路径验证已在main.py中完成，这里不再重复验证
 
-    matching_record = _find_license_by_path(
-        data, target_license_files, license_path, root_path, license_full_path
-    )
+    matching_record = _find_license_by_path(data, root_path, license_full_path)
 
     if matching_record:
         license_records = [matching_record]
@@ -325,15 +341,19 @@ def _select_license_path_record(
         warn(f"The file '{license_path}' may not be a valid license file")
         warn("Please check if the file contains complete license text")
         # 返回包含license_path的记录，让后续流程能从文件读取内容
-        license_records = [{
-            "file": license_path,
-            "spdx_identifier": "Unknown",
-            "license_expression": "Unknown",
-            "matched_text": "",
-        }]
+        license_records = [
+            {
+                "file": license_path,
+                "spdx_identifier": "Unknown",
+                "license_expression": "Unknown",
+                "matched_text": "",
+            }
+        ]
 
     # 提示用户人工核对
-    warn("请人工核对许可证信息是否准确 / Please manually verify the license information is accurate")
+    warn(
+        "请人工核对许可证信息是否准确 / Please manually verify the license information is accurate"
+    )
     return license_records
 
 
@@ -362,9 +382,7 @@ def _validate_license_path_name(
     info(f"Validating license name '{license_name}' against file path '{license_path}'")
 
     # 从路径提取license信息
-    matching_record = _find_license_by_path(
-        data, target_license_files, license_path, root_path, license_full_path
-    )
+    matching_record = _find_license_by_path(data, root_path, license_full_path)
 
     if matching_record:
         detected_spdx = matching_record.get("spdx_identifier", "")
@@ -376,34 +394,44 @@ def _validate_license_path_name(
         )
 
         if is_match:
-            info(f"License name '{license_name}' matches the license detected in file '{license_path}'")
+            info(
+                f"License name '{license_name}' matches the license detected in file '{license_path}'"
+            )
             _apply_user_name_for_non_spdx(matching_record, license_name)
             license_records = [matching_record]
         else:
             # 不匹配，输出警告但继续执行
-            warn(f"License name '{license_name}' does not match the license detected in file '{license_path}'")
+            warn(
+                f"License name '{license_name}' does not match the license detected in file '{license_path}'"
+            )
             warn("Please verify the license name and file path are correct")
             # 使用用户提供的名称，但保留检测到的matched_text
-            license_records = [{
-                "file": license_path,
-                "spdx_identifier": license_name,
-                "license_expression": license_name,
-                "matched_text": matching_record.get("matched_text", ""),
-            }]
+            license_records = [
+                {
+                    "file": license_path,
+                    "spdx_identifier": license_name,
+                    "license_expression": license_name,
+                    "matched_text": matching_record.get("matched_text", ""),
+                }
+            ]
     else:
         # 路径未识别出license信息，输出警告但继续执行
         warn(f"No license information found for path: {license_path}")
         warn(f"The file '{license_path}' may not be a valid license file")
         # 使用用户提供的license名称
-        license_records = [{
-            "file": license_path,
-            "spdx_identifier": license_name,
-            "license_expression": license_name,
-            "matched_text": "",
-        }]
+        license_records = [
+            {
+                "file": license_path,
+                "spdx_identifier": license_name,
+                "license_expression": license_name,
+                "matched_text": "",
+            }
+        ]
 
     # 提示用户人工核对
-    warn("请人工核对许可证信息是否准确 / Please manually verify the license information is accurate")
+    warn(
+        "请人工核对许可证信息是否准确 / Please manually verify the license information is accurate"
+    )
     return license_records
 
 
@@ -430,7 +458,6 @@ def _get_best_matched_text(file_info: dict) -> str:
 
     best_text = ""
     best_length = 0
-    best_match = None
     has_license_rule = False
 
     for detection in license_detections:
@@ -438,21 +465,21 @@ def _get_best_matched_text(file_info: dict) -> str:
         for match in matches:
             rule_id = match.get("rule_identifier", "")
             matched_text = match.get("matched_text", "")
-            matched_length = match.get("matched_length", len(matched_text) if matched_text else 0)
+            matched_length = match.get(
+                "matched_length", len(matched_text) if matched_text else 0
+            )
 
             # 优先选择 .LICENSE 规则
             if rule_id.endswith(".LICENSE"):
                 if not has_license_rule or matched_length > best_length:
                     best_text = matched_text
                     best_length = matched_length
-                    best_match = match
                     has_license_rule = True
             elif not has_license_rule:
                 # 没有 .LICENSE 规则时，选择最长的匹配
                 if matched_length > best_length:
                     best_text = matched_text
                     best_length = matched_length
-                    best_match = match
 
     # 如果matched_text为空但有matched_length，说明JSON中没有存储matched_text
     # 此时返回空字符串，调用者需要从源文件读取
@@ -552,6 +579,9 @@ def _mutually_contains(a: str, b: str) -> bool:
     """
     判断两个字符串是否互相包含（a含b 或 b含a）。
 
+    空串与任何字符串互含恒为真，会导致名称校验失效，
+    因此任一方为空直接返回False。
+
     Args:
         a: 字符串a（小写形式）
         b: 字符串b（小写形式）
@@ -559,12 +589,14 @@ def _mutually_contains(a: str, b: str) -> bool:
     Returns:
         bool: 是否互相包含
     """
+    if not a or not b:
+        return False
     return a in b or b in a
 
 
-def _license_name_matches(license_name_lower: str,
-                          detected_spdx: str,
-                          detected_license: str) -> bool:
+def _license_name_matches(
+    license_name_lower: str, detected_spdx: str, detected_license: str
+) -> bool:
     """
     检查用户提供的license名称是否与检出结果模糊匹配（支持部分匹配和忽略大小写）。
 
@@ -576,8 +608,9 @@ def _license_name_matches(license_name_lower: str,
     Returns:
         bool: 是否匹配
     """
-    return (_mutually_contains(license_name_lower, detected_spdx.lower()) or
-            _mutually_contains(license_name_lower, detected_license.lower()))
+    return _mutually_contains(
+        license_name_lower, detected_spdx.lower()
+    ) or _mutually_contains(license_name_lower, detected_license.lower())
 
 
 def _is_non_spdx_reference(value: str) -> bool:
@@ -595,7 +628,9 @@ def _apply_user_name_for_non_spdx(record: Dict[str, Any], license_name: str) -> 
     """
     detected_spdx = record.get("spdx_identifier", "")
     detected_license = record.get("license_expression", "")
-    if _is_non_spdx_reference(detected_spdx) or _is_non_spdx_reference(detected_license):
+    if _is_non_spdx_reference(detected_spdx) or _is_non_spdx_reference(
+        detected_license
+    ):
         record["spdx_identifier"] = license_name
         record["license_expression"] = license_name
 
@@ -617,15 +652,18 @@ def _detect_from_file_self(file_info: dict, file_path: str) -> bool:
     for det in file_info.get("license_detections", []):
         for m in det.get("matches", []):
             from_file = m.get("from_file", "")
-            if (m.get("rule_identifier", "").endswith(".LICENSE")
-                    and from_file and from_file != file_path):
+            if (
+                m.get("rule_identifier", "").endswith(".LICENSE")
+                and from_file
+                and from_file != file_path
+            ):
                 return False
     return True
 
 
-def _build_license_record(file_info: dict, file_path: str,
-                          detected_spdx: str,
-                          detected_license: str) -> Dict[str, Any]:
+def _build_license_record(
+    file_info: dict, file_path: str, detected_spdx: str, detected_license: str
+) -> Dict[str, Any]:
     """
     由单个scancode文件信息构造license记录。
 
@@ -649,7 +687,9 @@ def _build_license_record(file_info: dict, file_path: str,
     }
 
 
-def _filter_by_priority(groups: Dict[Any, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+def _filter_by_priority(
+    groups: Dict[Any, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
     """
     对分组的license记录按优先级去重，每组只保留优先级最高的记录。
 
@@ -673,12 +713,27 @@ def _filter_by_priority(groups: Dict[Any, List[Dict[str, Any]]]) -> List[Dict[st
             key=lambda r: (
                 _get_license_path_priority(r["file"]),
                 0 if r.get("from_file_self", True) else 1,
-            )
+            ),
         )
         # 只取优先级最高的（第一个）
         filtered_records.append(sorted_records[0])
-        debug(f"Multiple {key} license files found, selected: {sorted_records[0]['file']}")
+        debug(
+            f"Multiple {key} license files found, selected: {sorted_records[0]['file']}"
+        )
     return filtered_records
+
+
+def _dedup_by_final_name(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """按最终(spdx_identifier, license_expression)分组去重，每组保留
+    优先级最高的记录。用于-l名称覆盖之后：不同的LicenseRef检出被改写
+    为同一用户名称时，避免同名记录重复进入报告。"""
+    if len(records) <= 1:
+        return records
+    groups: Dict[Any, List[Dict[str, Any]]] = {}
+    for record in records:
+        key = (record["spdx_identifier"], record["license_expression"])
+        groups.setdefault(key, []).append(record)
+    return _filter_by_priority(groups)
 
 
 def _find_license_by_name(
@@ -724,7 +779,9 @@ def _find_license_by_name(
             continue
 
         # 检查是否匹配用户提供的license名称（支持部分匹配和忽略大小写）
-        if not _license_name_matches(license_name_lower, detected_spdx, detected_license):
+        if not _license_name_matches(
+            license_name_lower, detected_spdx, detected_license
+        ):
             continue
 
         # 初步去重：同一文件相同SPDX只添加一次
@@ -733,7 +790,8 @@ def _find_license_by_name(
             continue
         seen.add(unique_key)
         matching_records.append(
-            _build_license_record(file_info, file_path, detected_spdx, detected_license))
+            _build_license_record(file_info, file_path, detected_spdx, detected_license)
+        )
 
     # 按路径优先级去重：当有多个相同SPDX标识的license时，只保留优先级最高的
     if len(matching_records) > 1:
@@ -747,15 +805,13 @@ def _find_license_by_name(
 
 def _find_license_by_path(
     data: dict,
-    target_license_files: Set[str],
-    license_path: str,
     root_path: Optional[Path] = None,
     license_full_path: Optional[Path] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     根据license文件路径查找对应的license名称。
 
-    将扫描记录还原为绝对路径后与license_full_path精确比较，
+    将扫描记录还原为相对扫描根的路径后与目标文件精确比较，
     避免后缀匹配误选docs/LICENSE等嵌套同名文件。
 
     误匹配过滤：
@@ -764,8 +820,6 @@ def _find_license_by_path(
 
     Args:
         data: scancode JSON数据
-        target_license_files: 目标license文件集合（保留以兼容既有调用）
-        license_path: 要查找的license文件相对路径
         root_path: 实际扫描根目录
         license_full_path: license文件绝对路径（命令入口已规范化校验）
 
@@ -775,15 +829,27 @@ def _find_license_by_path(
     if root_path is None or license_full_path is None:
         return None
 
+    # 目标文件相对扫描根的路径只算一次，循环内做纯路径分量比较，
+    # 避免对每条扫描记录调用Path.resolve()（大仓库下是N次系统调用）
+    try:
+        target_parts = (
+            Path(license_full_path)
+            .resolve()
+            .relative_to(Path(root_path).resolve())
+            .parts
+        )
+    except ValueError:
+        return None
+
     for file_info in data.get("files", []):
         file_path = file_info.get("path", "").replace("\\", "/")
 
         # 扫描记录以扫描根目录名开头（如 json-3.11.3/LICENSE.MIT），
-        # 剥离根名前缀后拼接还原为绝对路径再比较
+        # 剥离根名前缀后得到相对路径再比较
         candidate = Path(_clean_scancode_path(file_path))
         if candidate.parts and candidate.parts[0].lower() == root_path.name.lower():
             candidate = Path(*candidate.parts[1:])
-        if (root_path / candidate).resolve() != license_full_path:
+        if candidate.parts != target_parts:
             continue
 
         detected_spdx = file_info.get("detected_license_expression_spdx", "")
@@ -1008,7 +1074,8 @@ def _extract_all_licenses(
         seen.add(unique_key)
 
         license_records.append(
-            _build_license_record(file_info, file_path, detected_spdx, detected_license))
+            _build_license_record(file_info, file_path, detected_spdx, detected_license)
+        )
 
     # 按路径优先级去重：当有多个相同(spdx, license)组合的license时，只保留优先级最高的
     # 优先级：根目录(1) > LICENSES目录(2) > 其他目录(3)
@@ -1056,10 +1123,12 @@ def write_license_report(
                 f.write(f"--- License #{i} ---\n")
                 f.write(f"File: {record.get('file', 'N/A')}\n")
                 f.write(f"SPDX Identifier: {record.get('spdx_identifier', 'N/A')}\n")
-                f.write(f"License Expression: {record.get('license_expression', 'N/A')}\n")
-                if record.get('matched_text'):
+                f.write(
+                    f"License Expression: {record.get('license_expression', 'N/A')}\n"
+                )
+                if record.get("matched_text"):
                     # 限制matched_text的长度
-                    text = record['matched_text']
+                    text = record["matched_text"]
                     if len(text) > 500:
                         text = text[:500] + "..."
                     f.write(f"Matched Text:\n{text}\n")

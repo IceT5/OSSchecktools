@@ -155,11 +155,17 @@ def error_exit(message: str, exit_code: int = 1) -> None:
 
     # 输出包含软件名称和版本的失败提示
     if _software_name and _software_version:
-        print(f"[ERROR] {_software_name} {_software_version} Readme.opensource生成失败，请修改完成后重新执行")
-        print(f"[ERROR] {_software_name} {_software_version} Readme.opensource generation failed. Please fix the issue and try again.")
+        print(
+            f"[ERROR] {_software_name} {_software_version} Readme.opensource生成失败，请修改完成后重新执行"
+        )
+        print(
+            f"[ERROR] {_software_name} {_software_version} Readme.opensource generation failed. Please fix the issue and try again."
+        )
     else:
-        print(f"[ERROR] Readme.opensource生成失败，请修改完成后重新执行")
-        print(f"[ERROR] Readme.opensource generation failed. Please fix the issue and try again.")
+        print("[ERROR] Readme.opensource生成失败，请修改完成后重新执行")
+        print(
+            "[ERROR] Readme.opensource generation failed. Please fix the issue and try again."
+        )
 
     # 执行清理回调
     if _cleanup_callback is not None:
