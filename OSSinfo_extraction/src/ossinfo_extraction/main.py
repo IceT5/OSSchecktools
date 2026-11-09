@@ -17,7 +17,10 @@ import os
 import argparse
 from pathlib import Path
 
-from ossinfo_extraction.logger import info, ok, warn, error, debug, has_error, error_exit, register_cleanup_callback, set_software_info
+from ossinfo_extraction.logger import (
+    info, ok, warn, error, debug, has_error, error_exit,
+    register_cleanup_callback, set_software_info,
+)
 from ossinfo_extraction.prerequisite import check_scancode_available
 from ossinfo_extraction.extract import run_extractcode
 from ossinfo_extraction.scancode import run_scancode
@@ -287,8 +290,8 @@ def _scan_source(scan_target, result_json, jobs, max_in_memory):
                         jobs=jobs, max_in_memory=max_in_memory)
 
 
-def _write_reports(scan_data, scan_target, software_info, output_files, license_path, license_full_path,
-                   jobs=4, max_in_memory=2000):
+def _write_reports(scan_data, scan_target, software_info, output_files,
+                   license_path, license_full_path, jobs=4, max_in_memory=2000):
     software_name, software_version, license_name = software_info
     _, output_copyright, output_license, output_readme = output_files
     # 提取copyright信息
