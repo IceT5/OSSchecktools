@@ -296,7 +296,8 @@ def _log_software_info(software_name, software_version, license_name, license_pa
 
 def _scan_source(scan_target, result_json, jobs, max_in_memory):
     check_scancode_available()
-    # run_scancode直接返回解析后的JSON数据（扫描失败但已生成部分有效结果时，告警后继续）
+    # run_scancode直接返回解析后的JSON数据；仅exit=1（扫描完成但个别文件
+    # 失败）允许使用本次部分结果，exit=2及其他非零码直接中断
     return run_scancode(
         scan_target,
         result_json,

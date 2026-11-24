@@ -23,7 +23,11 @@ from .logger import info, warn, cmd as log_cmd
 
 def _load_partial_result(result_json: Path, exit_code: int) -> Optional[dict]:
     """
-    非零退出码时尝试读取已生成的部分有效扫描结果。
+    exit=1 时尝试读取已生成的部分有效扫描结果。
+
+    ScanCode在扫描完成但个别文件/阶段失败时返回1，并已写出本次JSON。
+    exit=2及其他非零码不会走到这里：它们未正常完成扫描，路径上的文件
+    可能是上一次运行的旧结果。
 
     Args:
         result_json: 输出JSON文件路径
@@ -74,7 +78,7 @@ def run_scancode(
         dict: 解析后的ScanCode JSON结果数据
 
     Raises:
-        RuntimeError: ScanCode执行失败且无法生成有效结果
+        RuntimeError: ScanCode执行失败（非零退出码）；仅exit=1允许使用本次部分结果
     """
     cmd = ["scancode"]
     if scan_license:
@@ -104,10 +108,13 @@ def run_scancode(
     )
 
     if result.returncode != 0:
-        # ScanCode返回非零退出码，若已生成含有效文件的结果则告警后继续
-        data = _load_partial_result(result_json, result.returncode)
-        if data is not None:
-            return data
+        # exit=1：ScanCode已完成扫描，个别文件/阶段失败但本次JSON已写出，
+        # 允许读取部分结果继续；exit=2（参数/输入/setup/inventory错误）及
+        # 其他非零码未正常完成扫描，路径上可能是上一次的result.json，必须中断
+        if result.returncode == 1:
+            data = _load_partial_result(result_json, result.returncode)
+            if data is not None:
+                return data
         raise RuntimeError(f"ScanCode failed with exit code {result.returncode}")
 
     # 正常退出，读取结果

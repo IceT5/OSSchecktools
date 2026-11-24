@@ -119,7 +119,8 @@ samplelib-1.2.3/
 - -j/--max-in-memory透传（命令组装契约与真实透传两层验证）
 
 ### 容错与安全护栏
-- 扫描非零退出但有部分有效结果时告警续跑；无部分结果时RuntimeError
+- ScanCode exit=1（扫描完成但个别文件/阶段失败）时使用本次部分结果续跑；
+  exit=2及其他非零码中断，路径上的旧result.json不作为本次结果
 - 异常记录容错：缺path、缺license_detections、matches为空列表
 - 短文本引用（无.LICENSE规则且matched_length<20）过滤；长度>=20有效
 - headers为空列表/缺失时安全降级

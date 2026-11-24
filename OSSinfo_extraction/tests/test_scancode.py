@@ -14,14 +14,16 @@
 
 """ScanCode调用层（run_scancode/_load_partial_result）的单元测试。
 
-覆盖部分结果容错的四个分支与命令行组装契约（-l插入位置、
--j/--max-in-memory映射），不依赖真实scancode。
+覆盖退出码语义（仅exit=1允许部分结果）、部分结果的四个分支与命令行
+组装契约（-l插入位置、-j/--max-in-memory映射），不依赖真实scancode。
 """
 
 import json
+import os
 
 import pytest
 
+from conftest import run_cli
 from ossinfo_extraction.scancode import _load_partial_result, run_scancode
 
 
@@ -113,8 +115,8 @@ class TestCommandAssembly:
         assert seen["cmd"][1] == "-l"
         assert "-c" not in seen["cmd"]
 
-    def test_nonzero_exit_without_partial_raises(self, tmp_path, monkeypatch):
-        result_json = tmp_path / "r.json"  # 不存在部分结果
+    def test_exit_2_without_result_raises(self, tmp_path, monkeypatch):
+        result_json = tmp_path / "r.json"  # 本次未生成结果
 
         def fake_run(cmd, stdout=None, stderr=None):
             class R:
@@ -126,7 +128,64 @@ class TestCommandAssembly:
         with pytest.raises(RuntimeError):
             run_scancode(tmp_path / "target", result_json)
 
-    def test_nonzero_exit_with_partial_continues(self, tmp_path, monkeypatch, capsys):
+    def test_exit_2_with_stale_result_raises(self, tmp_path, monkeypatch):
+        """issue A：exit=2时路径上的旧result.json绝不能作为本次结果。"""
+        result_json = tmp_path / "r.json"
+        result_json.write_text(json.dumps({"files": [{"path": "old"}]}), encoding="utf-8")
+
+        def fake_run(cmd, stdout=None, stderr=None):
+            class R:
+                returncode = 2
+
+            return R()
+
+        monkeypatch.setattr("ossinfo_extraction.scancode.subprocess.run", fake_run)
+        with pytest.raises(RuntimeError):
+            run_scancode(tmp_path / "target", result_json)
+
+    def test_other_nonzero_with_stale_result_raises(self, tmp_path, monkeypatch):
+        """除1/2外的非零码同样不使用旧结果。"""
+        result_json = tmp_path / "r.json"
+        result_json.write_text(json.dumps({"files": [{"path": "old"}]}), encoding="utf-8")
+
+        def fake_run(cmd, stdout=None, stderr=None):
+            class R:
+                returncode = 3
+
+            return R()
+
+        monkeypatch.setattr("ossinfo_extraction.scancode.subprocess.run", fake_run)
+        with pytest.raises(RuntimeError):
+            run_scancode(tmp_path / "target", result_json)
+
+    def test_exit_1_without_result_raises(self, tmp_path, monkeypatch):
+        result_json = tmp_path / "r.json"  # 本次未生成结果
+
+        def fake_run(cmd, stdout=None, stderr=None):
+            class R:
+                returncode = 1
+
+            return R()
+
+        monkeypatch.setattr("ossinfo_extraction.scancode.subprocess.run", fake_run)
+        with pytest.raises(RuntimeError):
+            run_scancode(tmp_path / "target", result_json)
+
+    def test_exit_1_with_corrupt_result_raises(self, tmp_path, monkeypatch):
+        result_json = tmp_path / "r.json"
+        result_json.write_text("{not json", encoding="utf-8")
+
+        def fake_run(cmd, stdout=None, stderr=None):
+            class R:
+                returncode = 1
+
+            return R()
+
+        monkeypatch.setattr("ossinfo_extraction.scancode.subprocess.run", fake_run)
+        with pytest.raises(RuntimeError):
+            run_scancode(tmp_path / "target", result_json)
+
+    def test_exit_1_with_partial_continues(self, tmp_path, monkeypatch):
         result_json = tmp_path / "r.json"
         result_json.write_text(json.dumps({"files": [{"path": "a"}]}), encoding="utf-8")
 
@@ -139,3 +198,44 @@ class TestCommandAssembly:
         monkeypatch.setattr("ossinfo_extraction.scancode.subprocess.run", fake_run)
         data = run_scancode(tmp_path / "target", result_json)
         assert data["files"] == [{"path": "a"}]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="fake scancode uses a POSIX shell script")
+def test_cli_aborts_on_cli_error_with_stale_result(tmp_path):
+    """CLI级issue A：exit=2且输出目录有旧result.json时，流水线必须中断，
+    不得用旧结果生成当前项目的报告。"""
+    target = tmp_path / "pkg"
+    target.mkdir()
+    (target / "LICENSE").write_text("CURRENT PACKAGE LICENSE\n", encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "result.json").write_text(
+        json.dumps({"files": [{"path": "old/LICENSE",
+                               "detected_license_expression_spdx": "MIT",
+                               "detected_license_expression": "mit",
+                               "copyrights": [{"copyright": "Copyright 2021 OLD AUTHOR"}],
+                               "license_detections": [{"matches": [{
+                                   "rule_identifier": "mit.LICENSE",
+                                   "matched_length": 100,
+                                   "matched_text": "OLD MIT LICENSE TEXT"}]}]}]}),
+        encoding="utf-8",
+    )
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    scanner = bindir / "scancode"
+    scanner.write_text(
+        '#!/bin/sh\n'
+        'if [ "$1" = "--version" ]; then echo "ScanCode version: 32.5.0"; exit 0; fi\n'
+        'exit 2\n',
+        encoding="utf-8",
+    )
+    scanner.chmod(0o755)
+
+    result = run_cli(
+        tmp_path,
+        "-t", str(target), "-n", "CURRENT-SOFTWARE", "-v", "2.0", "-o", str(out),
+        env_extra={"PATH": str(bindir) + os.pathsep + os.environ["PATH"]},
+    )
+
+    assert result.returncode != 0
+    assert not (out / "Readme.opensource").exists()
